@@ -503,10 +503,44 @@ public class ScientificMilkyWayConsole
                     
                     if (isPlanet)
                     {
-                        Console.WriteLine($"\n  Planet {planetIndex} of companion star {companionLetter}");
-                        if (isMoon)
+                        // Generate the multiple star system to get companion's planetary system
+                        var multipleSystem = CompanionStarSystem.GenerateMultipleStarSystem(star);
+                        var companion = multipleSystem.Companions.FirstOrDefault(c => c.Designation == companionLetter);
+                        
+                        if (companion?.PlanetarySystem != null)
                         {
-                            Console.WriteLine($"  Moon {moonLetter} of planet {planetIndex}");
+                            var planet = companion.PlanetarySystem.Planets.FirstOrDefault(p => p.Index == planetIndex);
+                            if (planet != null)
+                            {
+                                Console.WriteLine($"\n  Planet {planetIndex} of companion star {companionLetter}:");
+                                Console.WriteLine($"    Type: {planet.Type}");
+                                Console.WriteLine($"    Mass: {planet.Mass:F2} Earth masses");
+                                Console.WriteLine($"    Orbital Distance: {planet.OrbitalDistance:F2} AU");
+                                Console.WriteLine($"    Moons: {planet.Moons.Count}");
+                                
+                                if (isMoon)
+                                {
+                                    var moon = planet.Moons.FirstOrDefault(m => m.Letter == moonLetter);
+                                    if (moon != null)
+                                    {
+                                        Console.WriteLine($"\n  Moon {moonLetter} of planet {planetIndex}:");
+                                        Console.WriteLine($"    Type: {moon.Type}");
+                                        Console.WriteLine($"    Mass: {moon.Mass:F4} Earth masses");
+                                    }
+                                    else
+                                    {
+                                        Console.WriteLine($"  Moon {moonLetter} not found");
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                Console.WriteLine($"  Planet {planetIndex} not found for companion {companionLetter}");
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine($"  No planetary system found for companion {companionLetter}");
                         }
                     }
                 }
@@ -568,13 +602,17 @@ public class ScientificMilkyWayConsole
                     {
                         Console.WriteLine($"  Multiple System: Yes");
                         
-                        var (_, companionCount, companionDesignations) = CompanionStarDatabase.GetCompanionInfo(star.Seed, star.Type);
-                        Console.WriteLine($"  Companion stars: {companionCount}");
-                        foreach (var designation in companionDesignations)
+                        // Generate the complete multiple star system with planetary systems
+                        var multipleSystem = CompanionStarSystem.GenerateMultipleStarSystem(star);
+                        Console.WriteLine($"  Companion stars: {multipleSystem.Companions.Count}");
+                        
+                        foreach (var companion in multipleSystem.Companions)
                         {
-                            var (mass, separationAU, _) = CompanionStarDatabase.GetCompanionProperties(star.Seed, star.Mass, designation);
-                            var companionType = CompanionStarDatabase.GetCompanionStellarType(mass, star.Seed, designation);
-                            Console.WriteLine($"    {starSeed}-{designation}: {companionType}, {mass:F2} solar masses, {separationAU:F1} AU separation");
+                            Console.WriteLine($"    {starSeed}-{companion.Designation}: {companion.Type}, {companion.Mass:F2} solar masses, {companion.SeparationAU:F1} AU separation");
+                            if (companion.PlanetarySystem != null && companion.PlanetarySystem.Planets.Count > 0)
+                            {
+                                Console.WriteLine($"      Planets: {companion.PlanetarySystem.Planets.Count}");
+                            }
                         }
                     }
                     

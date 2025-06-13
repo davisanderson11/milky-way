@@ -1,7 +1,15 @@
 # Milky Way Galaxy Simulation Project
 
 ## Overview
-This is a scientifically accurate Milky Way galaxy generator that creates a simulation of 100 billion unique stars. The project provides both console and visual interfaces for generating, analyzing, and visualizing galactic data.
+This is a scientifically accurate Milky Way galaxy generator that creates a simulation of 100 billion unique stars. The project uses the chunk-based system exclusively and features realistic stellar classifications based on the Harvard spectral system.
+
+## Recent Major Changes (June 2025)
+- **Removed old system**: Now uses only the chunk-based generation system
+- **Updated stellar types**: All stars now use proper astronomical notation (O5V, G2V, K0III, etc.)
+- **Enhanced companion stars**: Companions now have varied stellar types based on mass
+- **Improved star finder**: Supports both underscore (260_45_0_100_A) and dash (12345678-A) formats
+- **Cleaned up codebase**: Removed consistency tests and legacy code
+- **NEW: Companion star planetary systems**: Each companion star can now have its own planetary system with stable orbit calculations
 
 ## Quick Start
 
@@ -53,6 +61,7 @@ The heart of the simulation system. Key features:
 
 - **PlanetarySystemGenerator.cs**: Creates realistic planetary systems
 - **CompanionStarDatabase.cs**: Manages binary/multiple star systems
+- **CompanionStarSystem.cs**: NEW - Enhanced companion star support with planetary systems
 - **SpecialGalacticObjects.cs**: Handles unique objects (Sagittarius A*, etc.)
 - **AdvancedGalaxyStatistics.cs**: Analysis and verification tools
 
@@ -73,15 +82,22 @@ The heart of the simulation system. Key features:
 - Solar position at 26,000 ly from center
 - Density of ~0.14 stars/ly³ at Sun's location
 
+### Stellar Classification System
+Uses proper Harvard spectral classification with luminosity classes:
+- **Main Sequence (V)**: O5V, B0V, B5V, A0V, A5V, F0V, F5V, G0V, G5V, K0V, K5V, M0V, M5V, M8V
+- **Giants (III)**: K0III, K5III, M0III (red giants), B0III (blue giant)
+- **Supergiants (I)**: M2I (red supergiant), B0I (blue supergiant)
+- **Compact Objects**: DA (white dwarf), NS (neutron star), BH (black hole), SMBH (Sgr A*)
+
 ### Star Properties
 Each star includes:
 - 3D position (x, y, z in light years)
-- Spectral type and luminosity class
+- Spectral type with proper classification (e.g., G2V, K0III, M5V)
 - Mass, temperature, luminosity
 - Age and metallicity
 - Population type
 - Habitable zone boundaries
-- Companion star information
+- Companion star information with varied stellar types
 
 ### Planetary Systems
 - Generated based on stellar properties
@@ -89,33 +105,63 @@ Each star includes:
 - Planet types (terrestrial, gas giant, ice giant)
 - Moon systems for larger planets
 - Habitable zone considerations
+- **NEW: Companion stars have their own planetary systems**
+  - Each companion star can host planets
+  - Stable orbit calculations for multi-star systems
+  - S-type orbits (planets orbit one star) with stability constraints
+  - Orbital limits based on companion star separations
+  - Access companion planets with formats like `260_45_0_100_A_1` or `12345678-A-1`
 
 ## Usage Examples
 
 ### Console Interface Menu
-1. Generate a test sample of N stars
-2. Find a star by seed
-3. Generate full galaxy export (JSON)
-4. Generate Unity-compatible export
-5. Investigate a specific chunk
-6. View nearby stars
-7. Companion star statistics
-8. Generate planetary system
-9. Find habitable planets
+1. Export stars for Unity (JSON)
+2. Find star by seed (chunk-based system)
+3. Generate galaxy statistics
+4. Generate galaxy images
+5. Advanced analytical statistics
+6. Investigate galaxy chunk
+7. Exit
+
+The system now exclusively uses the chunk-based approach with no option to switch back to the old system.
 
 ### Code Usage
 ```csharp
-// Generate a single star
-var generator = new ScientificMilkyWayGenerator();
-var star = generator.GenerateStar(12345);
-
-// Use chunk-based system
+// Use chunk-based system (now the only system)
 var chunkSystem = new ChunkBasedGalaxySystem();
-var stars = chunkSystem.GenerateChunkStars(10, 45, 0); // r=1000ly, theta=45°, z=0
+
+// Find a star by encoded seed
+var star = chunkSystem.GetStarBySeed(12345678);
+
+// Generate stars in a chunk at r=1000ly, theta=45°, z=0
+var stars = chunkSystem.GenerateChunkStars(10, 45, 0);
+
+// Find star with specific chunk coordinates
+long seed = ChunkBasedGalaxySystem.EncodeSeed(260, 45, 0, 100);
+var star2 = chunkSystem.GetStarBySeed(seed);
 
 // Generate visualization
+var generator = new ScientificMilkyWayGenerator();
 var visualizer = new ScientificGalaxyVisualizer();
-visualizer.GenerateVisualization(stars, 4096, 4096, GalaxyView.Top);
+var sampleStars = generator.GenerateStars(100000);
+visualizer.GenerateVisualization(sampleStars, 4096, 4096, GalaxyView.Top);
+```
+
+### Finding Stars - Format Examples
+```
+# Encoded seed format
+12345678            # Direct seed lookup
+12345678-A          # Companion star A
+12345678-1          # Planet 1
+12345678-1-a        # Moon a of planet 1
+12345678-A-2        # Planet 2 of companion A
+12345678-A-2-b      # Moon b of planet 2 of companion A
+
+# Chunk coordinate format
+260_45_0_100        # Chunk r=260, theta=45, z=0, star index 100
+260_45_0_100_A      # Companion star A
+260_45_0_100_1      # Planet 1
+260_45_0_100_1_a    # Moon a of planet 1
 ```
 
 ## File Formats
@@ -161,11 +207,8 @@ This verifies that:
 
 ## Common Issues and Solutions
 
-### Missing ChunkBasedGalaxySystem Error
-Copy the file to the Visual project:
-```bash
-cp ChunkBasedGalaxySystem.cs ScientificMilkyWayVisual/
-```
+### Missing Files in Visual Project
+The compile-visual.bat script now automatically copies all required files including ChunkBasedGalaxySystem.cs.
 
 ### Build Errors
 Ensure .NET 8.0 SDK is installed:
@@ -173,8 +216,11 @@ Ensure .NET 8.0 SDK is installed:
 dotnet --version
 ```
 
+### Stellar Type Errors
+All stellar types now use the new classification system. If you see errors about old types (like "WhiteDwarf" or "RedGiant"), ensure you're using the latest version of all files.
+
 ### Memory Issues with Large Exports
-Use chunk-based generation and process in batches.
+Use chunk-based generation and process in batches. The chunk system allows you to generate specific regions without loading the entire galaxy.
 
 ## Future Enhancements
 
@@ -205,6 +251,84 @@ Use chunk-based generation and process in batches.
 - Cached trigonometric calculations
 - Bit manipulation for seed encoding
 - Parallel generation support
+
+## Converting to Unity
+
+### Approach 1: Direct Integration
+1. **Copy Core Classes**: Take these essential files to Unity:
+   - `ScientificMilkyWayGenerator.cs` (core generation logic)
+   - `ChunkBasedGalaxySystem.cs` (spatial indexing)
+   - `CompanionStarDatabase.cs` (if you want binary systems)
+   - `PlanetarySystemGenerator.cs` (if you want planets)
+
+2. **Remove System Dependencies**:
+   - Replace `Console.WriteLine` with `Debug.Log`
+   - The Vector3 struct can be replaced with Unity's Vector3
+   - Remove file I/O code or adapt to Unity's file system
+
+3. **Create Unity Components**:
+   ```csharp
+   public class GalaxyManager : MonoBehaviour
+   {
+       private ChunkBasedGalaxySystem galaxySystem;
+       
+       void Start()
+       {
+           galaxySystem = new ChunkBasedGalaxySystem();
+       }
+   }
+   ```
+
+### Approach 2: Dynamic LOD System
+1. **Chunk-Based Loading**: Use the chunk system for level-of-detail:
+   - Load nearby chunks in detail
+   - Use lower detail for distant chunks
+   - Unload chunks outside view distance
+
+2. **Star Rendering**:
+   - Use GPU instancing for performance
+   - Create star prefabs for different types
+   - Use particle systems for distant stars
+
+### Approach 3: Precomputed Data
+1. **Export from Console App**: Generate star data files
+2. **Import to Unity**: Load JSON/binary files as needed
+3. **Streaming System**: Load chunks on demand
+
+### Key Considerations
+- **Memory**: 100 billion stars = ~4TB if all loaded. Use chunking!
+- **Precision**: Unity uses floats, may need origin shifting for large scales
+- **Performance**: Generate stars on background threads
+- **Visuals**: Use LOD system - dots for distant, models for nearby
+
+### Example Unity Integration
+```csharp
+// Simple star spawner
+public class StarSpawner : MonoBehaviour
+{
+    public GameObject starPrefab;
+    private ChunkBasedGalaxySystem galaxy;
+    
+    void SpawnLocalStars(Vector3 playerPos)
+    {
+        // Convert Unity position to galaxy coordinates
+        int chunkR = (int)(playerPos.magnitude / 100);
+        int chunkTheta = (int)(Mathf.Atan2(playerPos.z, playerPos.x) * Mathf.Rad2Deg);
+        int chunkZ = (int)(playerPos.y / 100);
+        
+        // Generate stars for this chunk
+        var stars = galaxy.GenerateChunkStars(chunkR, chunkTheta, chunkZ);
+        
+        foreach (var star in stars)
+        {
+            // Spawn star GameObject
+            var go = Instantiate(starPrefab);
+            go.transform.position = new Vector3(star.Position.X, star.Position.Z, star.Position.Y);
+            // Set color, size based on star.Type
+        }
+    }
+}
+```
 
 ## Credits
 Created as a scientifically accurate galaxy simulation for games and visualizations.
