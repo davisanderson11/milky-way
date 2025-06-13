@@ -1,0 +1,62 @@
+# Build results
+[Dd]ebug/
+[Rr]elease/
+[Bb]in/
+[Oo]bj/
+x64/
+x86/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Visual Studio cache files
+.vs/
+
+# NuGet packages
+*.nupkg
+packages/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# .NET Core
+project.json.lock
+*.nuget.props
+*.nuget.targets
+
+# Visual Studio Code
+.vscode/
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Temporary files
+*.tmp
+*.temp
+~$*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Galaxy visualization outputs
+*.png
+*.jpg
+galaxy_export*.json
+MilkyWay_*.csv
+MilkyWay_*.json
