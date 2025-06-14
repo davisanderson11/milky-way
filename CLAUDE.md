@@ -30,6 +30,11 @@ This is a scientifically accurate Milky Way galaxy generator that creates a simu
   - Added interesting astronomical facts and context
   - Improved performance with optional sampling sizes
   - Added extreme star tracking (most massive, most luminous)
+- **Simplified Chunk System**:
+  - Removed complex hierarchical system
+  - Fixed 100 ly chunks everywhere
+  - No star count limits
+  - Much simpler for game integration
 
 ## Quick Start
 
@@ -70,12 +75,14 @@ The heart of the simulation system. Key features:
 - Sequential generation
 - Good for exports and specific star lookups
 
-**Chunk-Based System (ChunkBasedGalaxySystem.cs)**
-- Galaxy divided into 100×100×100 ly chunks
+**Galaxy Chunk System (GalaxyChunkSystem.cs)**
+- Fixed 100×100×100 ly chunks throughout the galaxy
 - Cylindrical coordinates (r, theta, z)
 - Seeds encode: ChunkR_ChunkTheta_ChunkZ_StarIndex
+- No star count limits - density handled naturally
 - Instant spatial queries
-- Better for "stars near position" operations
+- Simple and predictable for game integration
+- Extended range: up to 1M ly radius, ±50k ly vertical
 
 #### 3. Supporting Systems
 
@@ -145,28 +152,26 @@ Each star includes:
 ### Console Interface Menu
 1. Export stars for Unity (JSON)
 2. Find star by seed (chunk-based system)
-3. Generate galaxy statistics
+3. Generate comprehensive galaxy statistics
 4. Generate galaxy images
-5. Advanced analytical statistics
-6. Investigate galaxy chunk
-7. Exit
+5. Investigate galaxy chunk
+6. Exit
 
 The system now exclusively uses the chunk-based approach with no option to switch back to the old system.
 
 ### Code Usage
 ```csharp
-// Use chunk-based system (now the only system)
-var chunkSystem = new ChunkBasedGalaxySystem();
+// Use galaxy chunk system
+var chunkSystem = new GalaxyChunkSystem();
 
 // Find a star by encoded seed
 var star = chunkSystem.GetStarBySeed(12345678);
 
-// Generate stars in a chunk at r=1000ly, theta=45°, z=0
-var stars = chunkSystem.GenerateChunkStars(10, 45, 0);
+// Generate stars in a chunk
+var stars = chunkSystem.GenerateChunkStars("260_45_0");
 
-// Find star with specific chunk coordinates
-long seed = ChunkBasedGalaxySystem.EncodeSeed(260, 45, 0, 100);
-var star2 = chunkSystem.GetStarBySeed(seed);
+// Investigate a chunk
+chunkSystem.InvestigateChunk("0_0_0"); // Galactic center chunk
 
 // Generate visualization
 var generator = new ScientificMilkyWayGenerator();
@@ -186,7 +191,7 @@ visualizer.GenerateAllViews(4096, 4096, 500000, 1.0f); // Realistic 1:1 proporti
 12345678-A-2        # Planet 2 of companion A
 12345678-A-2-b      # Moon b of planet 2 of companion A
 
-# Chunk coordinate format
+# Chunk coordinate format (GalaxyChunkSystem)
 260_45_0_100        # Chunk r=260, theta=45, z=0, star index 100
 260_45_0_100_A      # Companion star A
 260_45_0_100_1      # Planet 1

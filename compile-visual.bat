@@ -17,7 +17,7 @@ if %ERRORLEVEL% EQU 0 (
     copy /Y ScientificMilkyWayGenerator.cs ScientificMilkyWayVisual\
     copy /Y ScientificGalaxyVisualizer2.cs ScientificMilkyWayVisual\
     copy /Y GalacticAnalytics.cs ScientificMilkyWayVisual\
-    copy /Y ChunkBasedGalaxySystem.cs ScientificMilkyWayVisual\
+    copy /Y GalaxyChunkSystem.cs ScientificMilkyWayVisual\
     copy /Y MultipleStarSystems.cs ScientificMilkyWayVisual\
     copy /Y PlanetarySystemGenerator.cs ScientificMilkyWayVisual\
     

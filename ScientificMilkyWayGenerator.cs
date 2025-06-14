@@ -486,8 +486,8 @@ public class ScientificMilkyWayGenerator
         if (population == StellarPopulation.Bulge && position.Length() < 100)
         {
             // Higher concentration of compact objects near galactic center
-            if (roll < 0.001) return StellarType.BH;    // 0.1% black holes
-            if (roll < 0.005) return StellarType.NS;    // 0.4% neutron stars
+            if (roll < 0.00004) return StellarType.BH;    // 0.004% black holes (2x normal)
+            if (roll < 0.00024) return StellarType.NS;    // 0.02% neutron stars (2x normal)
         }
         
         // Population-specific distributions based on metallicity and age
@@ -503,8 +503,8 @@ public class ScientificMilkyWayGenerator
                 if (roll < 0.75) return StellarType.M5V;        // 58% - lower mass stars dominate old populations
                 if (roll < 0.90) return StellarType.K0III;      // 15% - red giants common in old populations
                 if (roll < 0.98) return StellarType.DA;         // 8% - many white dwarfs from evolved stars
-                if (roll < 0.99995) return StellarType.NS;      // 0.195% - neutron stars
-                return StellarType.BH;                           // 0.005% - black holes
+                if (roll < 0.9998) return StellarType.NS;       // 0.01% - neutron stars (1 per 10,000)
+                return StellarType.BH;                           // 0.002% - black holes (1 per 50,000)
                 
             case StellarPopulation.ThickDisk:
                 // Intermediate age population
@@ -516,8 +516,8 @@ public class ScientificMilkyWayGenerator
                 if (roll < 0.82) return StellarType.M5V;        // 63%
                 if (roll < 0.90) return StellarType.K0III;      // 8% - red giants
                 if (roll < 0.97) return StellarType.DA;         // 7% - white dwarfs
-                if (roll < 0.9998) return StellarType.NS;       // 0.28% - neutron stars
-                return StellarType.BH;                           // 0.02% - black holes                
+                if (roll < 0.9998) return StellarType.NS;       // 0.01% - neutron stars (1 per 10,000)
+                return StellarType.BH;                           // 0.002% - black holes (1 per 50,000)                
             case StellarPopulation.ThinDisk:
                 // Check if in spiral arm for star formation
                 var spiralBoost = CalculateSpiralArmDensity(position) - 1.0f;
@@ -534,8 +534,8 @@ public class ScientificMilkyWayGenerator
                 if (roll < 0.9915) return StellarType.M5V;      // 76.45%
                 if (roll < 0.994) return StellarType.K0III;     // 0.25% - fewer evolved stars in young pop
                 if (roll < 0.999) return StellarType.DA;        // 0.5% - white dwarfs
-                if (roll < 0.99998) return StellarType.NS;      // 0.08% - neutron stars
-                return StellarType.BH;                           // 0.002% - black holes
+                if (roll < 0.9998) return StellarType.NS;       // 0.01% - neutron stars (1 per 10,000)
+                return StellarType.BH;                           // 0.002% - black holes (1 per 50,000)
                 
             case StellarPopulation.Bulge:
                 // Old, metal-rich population
@@ -547,8 +547,8 @@ public class ScientificMilkyWayGenerator
                 if (roll < 0.68) return StellarType.M5V;        // 52% - lower due to more evolved stars
                 if (roll < 0.80) return StellarType.K0III;      // 12% - many red giants in old bulge
                 if (roll < 0.92) return StellarType.DA;         // 12% - many white dwarfs
-                if (roll < 0.9995) return StellarType.NS;       // 0.75% - higher in dense bulge
-                return StellarType.BH;                           // 0.05% - slightly higher near center
+                if (roll < 0.9998) return StellarType.NS;       // 0.01% - neutron stars (1 per 10,000)
+                return StellarType.BH;                           // 0.002% - black holes (1 per 50,000)
                 
             default:
                 // Default to M dwarf

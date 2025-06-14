@@ -12,7 +12,7 @@ public class ScientificMilkyWayConsole
     static void Main(string[] args)
     {
         var generator = new ScientificMilkyWayGenerator();
-        var chunkBasedSystem = new ChunkBasedGalaxySystem();
+        var chunkSystem = new GalaxyChunkSystem();
         
         while (true)
         {
@@ -38,16 +38,16 @@ public class ScientificMilkyWayConsole
                     ExportForUnity(generator);
                     break;
                 case "2":
-                    FindStarBySeedChunkBased(chunkBasedSystem, generator);
+                    FindStarBySeedChunkBased(chunkSystem, generator);
                     break;
                 case "3":
-                    GenerateComprehensiveStatistics(generator, chunkBasedSystem);
+                    GenerateComprehensiveStatistics(generator, chunkSystem);
                     break;
                 case "4":
                     GenerateGalaxyImages(generator);
                     break;
                 case "5":
-                    InvestigateChunkNew(chunkBasedSystem);
+                    InvestigateChunk(chunkSystem);
                     break;
                 case "6":
                     return;
@@ -106,7 +106,7 @@ public class ScientificMilkyWayConsole
         Console.WriteLine($"✓ Exported {stars.Count:N0} stars to {filename}");
     }
     
-    static void GenerateComprehensiveStatistics(ScientificMilkyWayGenerator generator, ChunkBasedGalaxySystem chunkSystem)
+    static void GenerateComprehensiveStatistics(ScientificMilkyWayGenerator generator, GalaxyChunkSystem chunkSystem)
     {
         Console.WriteLine("\n=== COMPREHENSIVE GALAXY STATISTICS ===");
         Console.WriteLine("Choose analysis type:");
@@ -311,7 +311,7 @@ public class ScientificMilkyWayConsole
     }
     
     
-    static void FindStarBySeedChunkBased(ChunkBasedGalaxySystem chunkSystem, ScientificMilkyWayGenerator generator)
+    static void FindStarBySeedChunkBased(GalaxyChunkSystem chunkSystem, ScientificMilkyWayGenerator generator)
     {
         Console.WriteLine("\n=== Star Finder (Chunk-Based System) ===");
         Console.WriteLine("Seeds now encode: ChunkR_ChunkTheta_ChunkZ_StarIndex");
@@ -355,7 +355,7 @@ public class ScientificMilkyWayConsole
                     var parts = input.Split('-');
                     if (parts.Length >= 1 && long.TryParse(parts[0], out starSeed))
                     {
-                        var (r, theta, z, index) = ChunkBasedGalaxySystem.DecodeSeed(starSeed);
+                        var (r, theta, z, index) = GalaxyChunkSystem.DecodeSeed(starSeed);
                         Console.WriteLine($"Decoded to chunk {r}_{theta}_{z}, star index {index}");
                         
                         // Parse additional parts
@@ -413,7 +413,7 @@ public class ScientificMilkyWayConsole
                         int z = int.Parse(parts[2]);
                         int index = int.Parse(parts[3]);
                         
-                        starSeed = ChunkBasedGalaxySystem.EncodeSeed(r, theta, z, index);
+                        starSeed = GalaxyChunkSystem.EncodeSeed(r, theta, z, index);
                         Console.WriteLine($"Encoded seed: {starSeed}");
                         
                         // Check for additional parts (companion, planet, moon)
@@ -637,18 +637,19 @@ public class ScientificMilkyWayConsole
         }
     }
     
-    static void InvestigateChunkNew(ChunkBasedGalaxySystem chunkSystem)
+    static void InvestigateChunk(GalaxyChunkSystem chunkSystem)
     {
-        Console.WriteLine("\n=== Galaxy Chunk Investigator (NEW FAST VERSION) ===");
-        Console.WriteLine("Chunks use cylindrical coordinates: r_theta_z");
-        Console.WriteLine("This new system generates chunks INSTANTLY!");
-        Console.WriteLine("\nExamples:");
-        Console.WriteLine("  260_0_0    = Solar neighborhood chunk");
-        Console.WriteLine("  0_0_0      = Galactic center");
+        Console.WriteLine("\n=== Galaxy Chunk Investigator ===");
+        Console.WriteLine("Fixed 100 ly chunks with no star count limits");
+        Console.WriteLine("\nChunk format: r_theta_z");
+        Console.WriteLine("Examples:");
+        Console.WriteLine("  0_0_0     = Galactic center");
+        Console.WriteLine("  260_0_0   = Solar neighborhood");
+        Console.WriteLine("  100_180_5 = 10,000 ly opposite side, 500 ly above plane");
         
         while (true)
         {
-            Console.Write("\nEnter chunk ID (or 'q' to quit): ");
+            Console.Write("\nEnter chunk ID (r_theta_z) or 'q' to quit: ");
             var input = Console.ReadLine();
             
             if (input?.ToLower() == "q") break;
