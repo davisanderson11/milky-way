@@ -460,7 +460,7 @@ public class ScientificMilkyWayConsole
                 }
                 else if (long.TryParse(input, out starSeed))
                 {
-                    var (r, theta, z, index) = ChunkBasedGalaxySystem.DecodeSeed(starSeed);
+                    var (r, theta, z, index) = GalaxyChunkSystem.DecodeSeed(starSeed);
                     Console.WriteLine($"Decoded to chunk {r}_{theta}_{z}, star index {index}");
                 }
                 else
