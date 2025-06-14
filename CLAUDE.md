@@ -10,6 +10,26 @@ This is a scientifically accurate Milky Way galaxy generator that creates a simu
 - **Improved star finder**: Supports both underscore (260_45_0_100_A) and dash (12345678-A) formats
 - **Cleaned up codebase**: Removed consistency tests and legacy code
 - **NEW: Companion star planetary systems**: Each companion star can now have its own planetary system with stable orbit calculations
+- **Project Cleanup (Latest)**: Removed unused file GalaxyChunkSystem.cs and unused methods from SpecialGalacticObjects.cs and ScientificMilkyWayGenerator.cs
+- **Visualization Update**: Removed ScientificGalaxyVisualizer.cs in favor of the superior ScientificGalaxyVisualizer2.cs density-based implementation
+- **Code Consolidation**: Combined companion star files into MultipleStarSystems.cs and analytics files into GalacticAnalytics.cs
+- **Galaxy Structure Improvements**: 
+  - Fixed bulge parameters for more realistic peanut/boxy shape
+  - Adjusted vertical scale heights (bulge: 1400 ly, thick disk: 900 ly, thin disk: 300 ly)
+  - Fixed density singularity issues in central regions
+  - Added configurable Z-axis exaggeration for side view (1x for realistic, up to 10x for visibility)
+  - Eliminated visual artifacts (spikes near core, donut effect)
+  - Implemented smooth power-law density profiles (1/r² to 1/r³) for realistic falloff
+  - Fixed stellar type frequencies to match real-world observations:
+    - Black holes: ~0.001% (1 million total)
+    - Neutron stars: ~0.002% (2 million total)
+    - White dwarfs: 0.5-1% (varies by population)
+    - Main sequence follows Kroupa IMF
+- **Statistics Improvements**:
+  - Combined regular and advanced statistics into comprehensive viewer
+  - Added interesting astronomical facts and context
+  - Improved performance with optional sampling sizes
+  - Added extreme star tracking (most massive, most luminous)
 
 ## Quick Start
 
@@ -60,27 +80,35 @@ The heart of the simulation system. Key features:
 #### 3. Supporting Systems
 
 - **PlanetarySystemGenerator.cs**: Creates realistic planetary systems
-- **CompanionStarDatabase.cs**: Manages binary/multiple star systems
-- **CompanionStarSystem.cs**: NEW - Enhanced companion star support with planetary systems
-- **SpecialGalacticObjects.cs**: Handles unique objects (Sagittarius A*, etc.)
-- **AdvancedGalaxyStatistics.cs**: Analysis and verification tools
+- **MultipleStarSystems.cs**: Comprehensive binary/multiple star system management with planetary support
+- **GalacticAnalytics.cs**: Special objects (Sagittarius A*) and statistical analysis tools
 
 ### Visualization Components
 
-- **ScientificGalaxyVisualizer.cs**: Basic visualization with SkiaSharp
-- **ScientificGalaxyVisualizer2.cs**: Advanced density-based rendering
+- **ScientificGalaxyVisualizer2.cs**: Density-based rendering with SkiaSharp
+- Uses importance sampling to accurately represent galaxy density
 - Supports top-down, side, and 3D perspective views
 - Generates PNG images and heatmaps
+- Configurable Z-axis exaggeration for side view (1-10x, default 5x)
+- Side view can use realistic 1:1 proportions or exaggerated vertical scale
 
 ## Key Features
 
 ### Scientific Accuracy
-- Hernquist profile for galactic bulge
-- Exponential disk model with proper scale heights
-- Logarithmic spiral arms with realistic pitch angles
-- Central bar at 25° angle, 10,000 ly long
+- Modified Hernquist profile for galactic bulge (with core to avoid singularity)
+- Bulge radius: 5,000 ly with vertical scale height of 1,400 ly (peanut/boxy shape)
+- Exponential disk model with proper scale heights:
+  - Thin disk: 300 ly scale height (85% of disk stars)
+  - Thick disk: 900 ly scale height (15% of disk stars)
+- Power-law density profiles with smooth transitions:
+  - Core: ~1/r³ falloff
+  - Bulge: ~1/r²·⁵ falloff
+  - Disk: ~1/r¹·⁵ falloff
+- Logarithmic spiral arms with realistic pitch angles (~12.5°)
+- Central bar at 25° angle, 10,000 ly long, 3,000 ly wide
 - Solar position at 26,000 ly from center
 - Density of ~0.14 stars/ly³ at Sun's location
+- Realistic stellar type frequencies based on Kroupa IMF and population ages
 
 ### Stellar Classification System
 Uses proper Harvard spectral classification with luminosity classes:
@@ -142,9 +170,10 @@ var star2 = chunkSystem.GetStarBySeed(seed);
 
 // Generate visualization
 var generator = new ScientificMilkyWayGenerator();
-var visualizer = new ScientificGalaxyVisualizer();
-var sampleStars = generator.GenerateStars(100000);
-visualizer.GenerateVisualization(sampleStars, 4096, 4096, GalaxyView.Top);
+var visualizer = new ScientificGalaxyVisualizer2(generator);
+visualizer.GenerateAllViews(4096, 4096, 500000); // Default 5x Z exaggeration
+// Or with custom Z exaggeration:
+visualizer.GenerateAllViews(4096, 4096, 500000, 1.0f); // Realistic 1:1 proportions
 ```
 
 ### Finding Stars - Format Examples

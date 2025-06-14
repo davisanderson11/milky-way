@@ -54,15 +54,8 @@ public class PlanetarySystemGenerator
         };
         
         // No planets for certain stellar types
-        if (stellarType == ScientificMilkyWayGenerator.StellarType.K0III ||
-            stellarType == ScientificMilkyWayGenerator.StellarType.K5III ||
-            stellarType == ScientificMilkyWayGenerator.StellarType.M0III ||
-            stellarType == ScientificMilkyWayGenerator.StellarType.B0III ||
-            stellarType == ScientificMilkyWayGenerator.StellarType.M2I ||
+        if (stellarType == ScientificMilkyWayGenerator.StellarType.M2I ||
             stellarType == ScientificMilkyWayGenerator.StellarType.B0I ||
-            stellarType == ScientificMilkyWayGenerator.StellarType.DA ||
-            stellarType == ScientificMilkyWayGenerator.StellarType.NS ||
-            stellarType == ScientificMilkyWayGenerator.StellarType.BH ||
             stellarType == ScientificMilkyWayGenerator.StellarType.SMBH)
         {
             return system;

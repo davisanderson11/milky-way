@@ -164,7 +164,7 @@ public class ChunkBasedGalaxySystem
         var planetarySystem = planetarySystemGen.GeneratePlanetarySystem(seed, type, mass, $"Star-{seed}");
         
         // Check for companions
-        var (isMultiple, companionCount, companions) = CompanionStarDatabase.GetCompanionInfo(seed, type);
+        var (isMultiple, companionCount, companions) = MultipleStarSystems.GetCompanionInfo(seed, type);
         
         return new ScientificMilkyWayGenerator.Star
         {
@@ -179,7 +179,7 @@ public class ChunkBasedGalaxySystem
             Region = baseGenerator.DetermineRegion(position),
             PlanetCount = planetarySystem.Planets.Count,
             IsMultiple = isMultiple,
-            SystemName = CompanionStarDatabase.GetSystemName(seed, type)
+            SystemName = MultipleStarSystems.GetSystemName(seed, type)
         };
     }
     
@@ -203,7 +203,7 @@ public class ChunkBasedGalaxySystem
                 for (int k = 0; k < 3; k++)
                 {
                     double z = bounds.zMin + (bounds.zMax - bounds.zMin) * (k + 0.5) / 3;
-                    totalDensity += AdvancedGalaxyStatistics.CalculateStellarDensity(r, z, theta);
+                    totalDensity += GalacticAnalytics.CalculateStellarDensity(r, z);
                     samples++;
                 }
             }
@@ -234,7 +234,7 @@ public class ChunkBasedGalaxySystem
         
         // First add special objects (like Sgr A*)
         var bounds = chunk.GetBounds();
-        var specialObjects = SpecialGalacticObjects.GetSpecialObjectsInChunk(
+        var specialObjects = GalacticAnalytics.GetSpecialObjectsInChunk(
             bounds.rMin, bounds.rMax, bounds.thetaMin, bounds.thetaMax, bounds.zMin, bounds.zMax);
         stars.AddRange(specialObjects);
         

@@ -23,11 +23,10 @@ public class ScientificMilkyWayConsole
             Console.WriteLine();
             Console.WriteLine("1. Export stars for Unity (JSON)");
             Console.WriteLine("2. Find star by seed");
-            Console.WriteLine("3. Generate galaxy statistics");
+            Console.WriteLine("3. Generate comprehensive galaxy statistics");
             Console.WriteLine("4. Generate galaxy images");
-            Console.WriteLine("5. Advanced analytical statistics");
-            Console.WriteLine("6. Investigate galaxy chunk");
-            Console.WriteLine("7. Exit");
+            Console.WriteLine("5. Investigate galaxy chunk");
+            Console.WriteLine("6. Exit");
             Console.WriteLine();
             Console.Write("Select option: ");
             
@@ -42,18 +41,15 @@ public class ScientificMilkyWayConsole
                     FindStarBySeedChunkBased(chunkBasedSystem, generator);
                     break;
                 case "3":
-                    GenerateStatistics(generator);
+                    GenerateComprehensiveStatistics(generator, chunkBasedSystem);
                     break;
                 case "4":
                     GenerateGalaxyImages(generator);
                     break;
                 case "5":
-                    GenerateAdvancedStatistics(generator);
-                    break;
-                case "6":
                     InvestigateChunkNew(chunkBasedSystem);
                     break;
-                case "7":
+                case "6":
                     return;
             }
             
@@ -110,204 +106,210 @@ public class ScientificMilkyWayConsole
         Console.WriteLine($"✓ Exported {stars.Count:N0} stars to {filename}");
     }
     
-    static void GenerateStatistics(ScientificMilkyWayGenerator generator)
+    static void GenerateComprehensiveStatistics(ScientificMilkyWayGenerator generator, ChunkBasedGalaxySystem chunkSystem)
     {
-        Console.WriteLine("\n=== Galaxy Statistics ===");
-        Console.WriteLine("Analyzing 1 million star sample...");
+        Console.WriteLine("\n=== COMPREHENSIVE GALAXY STATISTICS ===");
+        Console.WriteLine("Choose analysis type:");
+        Console.WriteLine("1. Sample-based statistics (1M stars - fast)");
+        Console.WriteLine("2. Analytical statistics (mathematical - instant)");
+        Console.WriteLine("3. Both sample and analytical");
+        Console.Write("Selection (1-3): ");
         
-        var stars = generator.GenerateStars(1000000);
+        var choice = Console.ReadLine();
+        bool doSample = choice == "1" || choice == "3";
+        bool doAnalytical = choice == "2" || choice == "3";
         
-        var typeGroups = stars.GroupBy(s => s.Type).OrderByDescending(g => g.Count());
-        var popGroups = stars.GroupBy(s => s.Population).OrderByDescending(g => g.Count());
-        var regionGroups = stars.GroupBy(s => s.Region).OrderByDescending(g => g.Count());
-        
-        Console.WriteLine("\nStar Types:");
-        foreach (var group in typeGroups)
+        if (doSample)
         {
-            Console.WriteLine($"  {group.Key,-15} {group.Count(),8} ({group.Count() / 10000.0:F1}%)");
+            Console.WriteLine("\n--- SAMPLE-BASED ANALYSIS ---");
+            Console.Write("Number of stars to sample (100000-10000000, default 1000000): ");
+            if (!int.TryParse(Console.ReadLine(), out int sampleSize) || sampleSize < 100000 || sampleSize > 10000000)
+            {
+                sampleSize = 1000000;
+            }
+            
+            Console.WriteLine($"\nAnalyzing {sampleSize:N0} star sample...");
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var stars = generator.GenerateStars(sampleSize);
+            sw.Stop();
+            Console.WriteLine($"Sample generated in {sw.ElapsedMilliseconds:N0} ms");
+            
+            // Stellar classification breakdown with interesting facts
+            Console.WriteLine("\n[STELLAR CLASSIFICATION]");
+            var typeGroups = stars.GroupBy(s => s.Type).OrderByDescending(g => g.Count());
+            foreach (var group in typeGroups.Take(10))
+            {
+                var percentage = group.Count() * 100.0 / sampleSize;
+                var estimatedTotal = (long)(percentage * 1e9); // Scale to 100 billion
+                var properties = generator.GetStellarProperties(group.Key);
+                
+                Console.WriteLine($"  {group.Key,-6} {percentage,5:F2}% (~{estimatedTotal/1e9:F1}B stars) - " +
+                    $"{properties.temperature:F0}K, {properties.mass:F2}M☉, {GetStarDescription(group.Key)}");
+            }
+            
+            // Multiple star systems
+            var multipleStars = stars.Where(s => s.IsMultiple).Count();
+            Console.WriteLine($"\n[MULTIPLE STAR SYSTEMS]");
+            Console.WriteLine($"  Binary/Multiple Systems: {multipleStars * 100.0 / sampleSize:F1}% (~{multipleStars * 100L:N0} million systems)");
+            
+            // Planetary statistics
+            var starsWithPlanets = stars.Where(s => s.PlanetCount > 0).ToList();
+            var totalPlanets = starsWithPlanets.Sum(s => s.PlanetCount);
+            Console.WriteLine($"\n[PLANETARY SYSTEMS]");
+            Console.WriteLine($"  Stars with planets: {starsWithPlanets.Count * 100.0 / sampleSize:F1}% (~{starsWithPlanets.Count * 100L:N0} million systems)");
+            Console.WriteLine($"  Average planets per system: {(double)totalPlanets / starsWithPlanets.Count:F2}");
+            Console.WriteLine($"  Estimated total planets: ~{totalPlanets * 100L:N0} million");
+            
+            // Spatial distribution analysis
+            Console.WriteLine($"\n[SPATIAL DISTRIBUTION]");
+            var regionGroups = stars.GroupBy(s => s.Region).OrderByDescending(g => g.Count());
+            foreach (var group in regionGroups)
+            {
+                var regionStars = group.ToList();
+                var avgR = regionStars.Average(s => Math.Sqrt(s.Position.X * s.Position.X + s.Position.Y * s.Position.Y));
+                var avgZ = regionStars.Average(s => Math.Abs(s.Position.Z));
+                Console.WriteLine($"  {group.Key,-20} {group.Count() * 100.0 / sampleSize,5:F1}% - Avg R: {avgR:F0} ly, Avg |Z|: {avgZ:F0} ly");
+            }
+            
+            // Population analysis
+            Console.WriteLine($"\n[STELLAR POPULATIONS & METALLICITY]");
+            var popGroups = stars.GroupBy(s => s.Population).OrderByDescending(g => g.Count());
+            foreach (var group in popGroups)
+            {
+                var popStars = group.ToList();
+                var avgAge = GetPopulationAge(group.Key);
+                Console.WriteLine($"  {group.Key,-12} {group.Count() * 100.0 / sampleSize,5:F1}% - Age: {avgAge}, {GetPopulationDescription(group.Key)}");
+            }
+            
+            // Extreme stars
+            Console.WriteLine($"\n[EXTREME STARS IN SAMPLE]");
+            var massiveStars = stars.Where(s => s.Mass > 20).OrderByDescending(s => s.Mass).Take(5);
+            Console.WriteLine($"  Most Massive Stars:");
+            foreach (var star in massiveStars)
+            {
+                Console.WriteLine($"    Seed {star.Seed}: {star.Type} - {star.Mass:F1} M☉ at ({star.Position.X:F0}, {star.Position.Y:F0}, {star.Position.Z:F0})");
+            }
+            
+            var brightestStars = stars.Where(s => s.Luminosity > 10000).OrderByDescending(s => s.Luminosity).Take(5);
+            Console.WriteLine($"  Most Luminous Stars:");
+            foreach (var star in brightestStars)
+            {
+                Console.WriteLine($"    Seed {star.Seed}: {star.Type} - {star.Luminosity:F0} L☉ ({star.Luminosity/3.828e26:E2} watts)");
+            }
+            
+            // Density variations
+            Console.WriteLine($"\n[DENSITY ANALYSIS]");
+            var centralStars = stars.Where(s => s.Position.Length() < 1000).Count();
+            var diskStars = stars.Where(s => s.Position.Length2D() > 20000 && s.Position.Length2D() < 30000 && Math.Abs(s.Position.Z) < 500).Count();
+            var haloStars = stars.Where(s => s.Position.Length() > 50000).Count();
+            
+            var centralVolume = 4.0/3.0 * Math.PI * Math.Pow(1000, 3);
+            var diskVolume = Math.PI * (Math.Pow(30000, 2) - Math.Pow(20000, 2)) * 1000;
+            var haloVolume = 4.0/3.0 * Math.PI * (Math.Pow(100000, 3) - Math.Pow(50000, 3));
+            
+            Console.WriteLine($"  Central region (<1 kly): {centralStars / centralVolume:E2} stars/ly³");
+            Console.WriteLine($"  Disk (20-30 kly, |z|<500): {diskStars / diskVolume:E2} stars/ly³");
+            Console.WriteLine($"  Halo (>50 kly): {haloStars / haloVolume:E2} stars/ly³");
+            Console.WriteLine($"  Density contrast (center/disk): {(centralStars / centralVolume) / (diskStars / diskVolume):F0}x");
         }
         
-        Console.WriteLine("\nStellar Populations:");
-        foreach (var group in popGroups)
+        if (doAnalytical)
         {
-            Console.WriteLine($"  {group.Key,-15} {group.Count(),8} ({group.Count() / 10000.0:F1}%)");
+            Console.WriteLine("\n--- ANALYTICAL CALCULATIONS ---");
+            GalacticAnalytics.GenerateReport(generator);
         }
         
-        Console.WriteLine("\nGalactic Regions:");
-        foreach (var group in regionGroups)
+        // Fun facts
+        Console.WriteLine("\n[INTERESTING FACTS]");
+        Console.WriteLine($"  • If you could travel at light speed, crossing the galaxy would take 100,000 years");
+        Console.WriteLine($"  • The galaxy rotates once every ~225 million years (one 'galactic year')");
+        Console.WriteLine($"  • Our Sun has completed ~20 galactic orbits since its formation");
+        Console.WriteLine($"  • There are more stars in our galaxy than grains of sand on all Earth's beaches");
+        Console.WriteLine($"  • The supermassive black hole at the center has a mass of 4.3 million suns");
+        Console.WriteLine($"  • Most stars (75%) are smaller and cooler than our Sun");
+        Console.WriteLine($"  • The galaxy's dark matter halo extends far beyond the visible stars");
+    }
+    
+    static string GetStarDescription(ScientificMilkyWayGenerator.StellarType type)
+    {
+        return type switch
         {
-            Console.WriteLine($"  {group.Key,-15} {group.Count(),8} ({group.Count() / 10000.0:F1}%)");
-        }
-        
-        var avgDistance = stars.Average(s => Math.Sqrt(s.Position.X * s.Position.X + s.Position.Y * s.Position.Y + s.Position.Z * s.Position.Z));
-        var maxDistance = stars.Max(s => Math.Sqrt(s.Position.X * s.Position.X + s.Position.Y * s.Position.Y + s.Position.Z * s.Position.Z));
-        
-        Console.WriteLine($"\nDistance Statistics:");
-        Console.WriteLine($"  Average distance from center: {avgDistance:F0} ly");
-        Console.WriteLine($"  Maximum distance from center: {maxDistance:F0} ly");
+            ScientificMilkyWayGenerator.StellarType.O5V => "Extremely hot blue stars, very rare",
+            ScientificMilkyWayGenerator.StellarType.B0V => "Hot blue-white stars, massive and short-lived",
+            ScientificMilkyWayGenerator.StellarType.A0V => "White stars like Sirius",
+            ScientificMilkyWayGenerator.StellarType.F0V => "Yellow-white stars, slightly hotter than Sun",
+            ScientificMilkyWayGenerator.StellarType.G5V => "Sun-like yellow stars",
+            ScientificMilkyWayGenerator.StellarType.K5V => "Orange dwarf stars, very common",
+            ScientificMilkyWayGenerator.StellarType.M5V => "Red dwarf stars, most numerous",
+            ScientificMilkyWayGenerator.StellarType.K0III => "Red giant stars",
+            ScientificMilkyWayGenerator.StellarType.M2I => "Red supergiant stars like Betelgeuse",
+            ScientificMilkyWayGenerator.StellarType.DA => "White dwarf stellar remnants",
+            ScientificMilkyWayGenerator.StellarType.NS => "Neutron star/pulsar remnants",
+            ScientificMilkyWayGenerator.StellarType.BH => "Stellar-mass black holes",
+            ScientificMilkyWayGenerator.StellarType.SMBH => "Supermassive black hole (Sgr A*)",
+            _ => "Unknown type"
+        };
+    }
+    
+    static string GetPopulationAge(ScientificMilkyWayGenerator.StellarPopulation pop)
+    {
+        return pop switch
+        {
+            ScientificMilkyWayGenerator.StellarPopulation.PopIII => "13+ Gyr",
+            ScientificMilkyWayGenerator.StellarPopulation.PopII => "10-13 Gyr",
+            ScientificMilkyWayGenerator.StellarPopulation.Halo => "11-13 Gyr",
+            ScientificMilkyWayGenerator.StellarPopulation.Bulge => "10-12 Gyr",
+            ScientificMilkyWayGenerator.StellarPopulation.ThickDisk => "8-10 Gyr",
+            ScientificMilkyWayGenerator.StellarPopulation.ThinDisk => "0-8 Gyr",
+            _ => "Unknown"
+        };
+    }
+    
+    static string GetPopulationDescription(ScientificMilkyWayGenerator.StellarPopulation pop)
+    {
+        return pop switch
+        {
+            ScientificMilkyWayGenerator.StellarPopulation.PopIII => "First generation, metal-free stars",
+            ScientificMilkyWayGenerator.StellarPopulation.PopII => "Old, metal-poor stars",
+            ScientificMilkyWayGenerator.StellarPopulation.Halo => "Ancient halo stars, eccentric orbits",
+            ScientificMilkyWayGenerator.StellarPopulation.Bulge => "Old bulge/bar stars",
+            ScientificMilkyWayGenerator.StellarPopulation.ThickDisk => "Intermediate age, heated orbits",
+            ScientificMilkyWayGenerator.StellarPopulation.ThinDisk => "Young disk stars, circular orbits",
+            _ => "Unknown population"
+        };
     }
     
     static void GenerateGalaxyImages(ScientificMilkyWayGenerator generator)
     {
         Console.WriteLine("\n=== Generate Galaxy Images ===");
-        Console.WriteLine("Choose visualization method:");
-        Console.WriteLine("1. Original (uniform sampling) - fast but misses core detail");
-        Console.WriteLine("2. Density-based sampling - accurate representation");
-        Console.Write("Choice (1-2): ");
-        
-        var method = Console.ReadLine();
-        
-        if (method == "2")
+        Console.Write("Number of stars (100000-10000000, default 500000): ");
+        if (!int.TryParse(Console.ReadLine(), out int count) || count < 100000 || count > 10000000)
         {
-            Console.Write("Number of stars (100000-2000000, default 500000): ");
-            if (!int.TryParse(Console.ReadLine(), out int count) || count < 100000 || count > 2000000)
-            {
-                count = 500000;
-                Console.WriteLine($"Using default: {count:N0}");
-            }
-            
-            var visualizer2 = new ScientificGalaxyVisualizer2(generator);
-            visualizer2.GenerateAllViews(2048, 2048, count);
+            count = 500000;
+            Console.WriteLine($"Using default: {count:N0}");
+        }
+        
+        Console.Write("Z-axis exaggeration for side view (1-10, default 5, use 1 for realistic): ");
+        if (!float.TryParse(Console.ReadLine(), out float zExaggeration) || zExaggeration < 1 || zExaggeration > 10)
+        {
+            zExaggeration = 5.0f;
+            Console.WriteLine($"Using default: {zExaggeration:F1}x");
+        }
+        
+        var visualizer = new ScientificGalaxyVisualizer2(generator);
+        visualizer.GenerateAllViews(2048, 2048, count, zExaggeration);
+        
+        Console.WriteLine("\nImages have been saved to the current directory!");
+        if (zExaggeration == 1.0f)
+        {
+            Console.WriteLine("Note: Side view uses realistic proportions (1:1 scale)");
         }
         else
         {
-            Console.Write("Number of stars (10000-1000000, default 100000): ");
-            if (!int.TryParse(Console.ReadLine(), out int count) || count < 10000 || count > 1000000)
-            {
-                count = 100000;
-                Console.WriteLine($"Using default: {count:N0}");
-            }
-            
-            var visualizer = new ScientificGalaxyVisualizer(generator, count);
-            visualizer.GenerateAllViews();
+            Console.WriteLine($"Note: Side view Z-axis exaggerated by {zExaggeration:F1}x for visibility");
         }
-        
-        Console.WriteLine("\nImages have been saved to the current directory!");
     }
     
-    static void GenerateAdvancedStatistics(ScientificMilkyWayGenerator generator)
-    {
-        // Use analytical calculations instead of sampling
-        AdvancedGalaxyStatistics.GenerateReport();
-        
-        // Optional: Generate a small sample for verification
-        Console.WriteLine("\n=== Sample Verification ===");
-        Console.Write("Generate sample stars for verification? (y/n): ");
-        if (Console.ReadLine()?.ToLower() == "y")
-        {
-            Console.Write("Number of stars (1000-10000): ");
-            if (!int.TryParse(Console.ReadLine(), out int count) || count < 1000 || count > 10000)
-            {
-                count = 5000;
-            }
-            Console.WriteLine($"\nGenerating {count:N0} stars for verification...");
-        var stars = generator.GenerateStars(count);
-        
-        // Group stars by region
-        var regionGroups = stars.GroupBy(s => s.Region).ToList();
-        
-        Console.WriteLine("\n=== Inter-Star Distances by Region ===");
-        Console.WriteLine("Region | Stars | Avg Distance | Min Distance | Density (stars/ly³)");
-        Console.WriteLine(new string('-', 80));
-        
-        foreach (var region in regionGroups.OrderByDescending(g => g.Count()))
-        {
-            var regionStars = region.ToList();
-            if (regionStars.Count < 10) continue; // Skip regions with too few stars
-            
-            // Calculate nearest neighbor distances
-            var distances = new List<double>();
-            var sampleSize = Math.Min(1000, regionStars.Count); // Sample for performance
-            var random = new Random();
-            var sample = regionStars.OrderBy(x => random.Next()).Take(sampleSize).ToList();
-            
-            foreach (var star in sample)
-            {
-                double minDist = double.MaxValue;
-                foreach (var other in sample.Where(s => s.Seed != star.Seed))
-                {
-                    var dx = star.Position.X - other.Position.X;
-                    var dy = star.Position.Y - other.Position.Y;
-                    var dz = star.Position.Z - other.Position.Z;
-                    var dist = Math.Sqrt(dx * dx + dy * dy + dz * dz);
-                    if (dist < minDist) minDist = dist;
-                }
-                if (minDist < double.MaxValue)
-                    distances.Add(minDist);
-            }
-            
-            if (distances.Count > 0)
-            {
-                var avgDist = distances.Average();
-                var minDist = distances.Min();
-                
-                // Estimate density (stars per cubic light-year)
-                var density = 1.0 / (avgDist * avgDist * avgDist * 4.189); // 4/3 * pi
-                
-                Console.WriteLine($"{region.Key,-20} | {regionStars.Count,6} | {avgDist,12:F2} ly | {minDist,12:F2} ly | {density:E2}");
-            }
-        }
-        
-        Console.WriteLine("\n=== Stellar Type Distribution by Region ===");
-        
-        // Analyze stellar types by region
-        var majorRegions = regionGroups.Where(g => g.Count() > 100).OrderByDescending(g => g.Count()).Take(5);
-        
-        foreach (var region in majorRegions)
-        {
-            Console.WriteLine($"\n{region.Key} ({region.Count():N0} stars):");
-            var typeGroups = region.GroupBy(s => s.Type).OrderByDescending(g => g.Count()).Take(5);
-            foreach (var type in typeGroups)
-            {
-                Console.WriteLine($"  {type.Key,-15} {type.Count(),8} ({type.Count() * 100.0 / region.Count():F1}%)");
-            }
-        }
-        
-        Console.WriteLine("\n=== Distance Analysis from Galactic Center ===");
-        
-        // Analyze radial distribution
-        var radialBins = new[] { 1000, 5000, 10000, 15000, 20000, 30000, 40000, 50000, 100000 };
-        var lastBin = 0;
-        
-        Console.WriteLine("Distance Range (ly) | Star Count | Avg. Luminosity | Most Common Type");
-        Console.WriteLine(new string('-', 80));
-        
-        foreach (var bin in radialBins)
-        {
-            var starsInBin = stars.Where(s =>
-            {
-                var dist = Math.Sqrt(s.Position.X * s.Position.X + s.Position.Y * s.Position.Y + s.Position.Z * s.Position.Z);
-                return dist > lastBin && dist <= bin;
-            }).ToList();
-            
-            if (starsInBin.Any())
-            {
-                var avgLum = starsInBin.Average(s => s.Luminosity);
-                var mostCommon = starsInBin.GroupBy(s => s.Type).OrderByDescending(g => g.Count()).First().Key;
-                
-                Console.WriteLine($"{lastBin,6:N0} - {bin,6:N0} | {starsInBin.Count,10:N0} | {avgLum,15:F3} | {mostCommon}");
-            }
-            
-            lastBin = bin;
-        }
-        
-        Console.WriteLine("\n=== Spiral Arm Analysis ===");
-        
-        // Identify stars in spiral arms vs inter-arm regions
-        var spiralArmRegions = new[] { "Perseus Arm", "Scutum-Centaurus Arm", "Sagittarius Arm", "Norma Arm", "Local Arm (Orion Spur)" };
-        var armStars = stars.Where(s => spiralArmRegions.Any(arm => s.Region.Contains(arm))).ToList();
-        var interArmStars = stars.Where(s => !spiralArmRegions.Any(arm => s.Region.Contains(arm))).ToList();
-        
-        Console.WriteLine($"Stars in spiral arms: {armStars.Count:N0} ({armStars.Count * 100.0 / stars.Count:F1}%)");
-        Console.WriteLine($"Stars between arms: {interArmStars.Count:N0} ({interArmStars.Count * 100.0 / stars.Count:F1}%)");
-        
-            if (armStars.Any() && interArmStars.Any())
-            {
-                Console.WriteLine($"Avg luminosity in arms: {armStars.Average(s => s.Luminosity):F3}");
-                Console.WriteLine($"Avg luminosity between arms: {interArmStars.Average(s => s.Luminosity):F3}");
-            }
-        }
-    }
     
     static void FindStarBySeedChunkBased(ChunkBasedGalaxySystem chunkSystem, ScientificMilkyWayGenerator generator)
     {
@@ -487,11 +489,11 @@ public class ScientificMilkyWayConsole
                     Console.WriteLine($"  Primary star type: {star.Type}");
                     Console.WriteLine($"  Primary star mass: {star.Mass:F3} solar masses");
                     
-                    var (_, companionCount, companionDesignations) = CompanionStarDatabase.GetCompanionInfo(star.Seed, star.Type);
+                    var (_, companionCount, companionDesignations) = MultipleStarSystems.GetCompanionInfo(star.Seed, star.Type);
                     if (companionDesignations.Contains(companionLetter))
                     {
-                        var (mass, separationAU, _) = CompanionStarDatabase.GetCompanionProperties(star.Seed, star.Mass, companionLetter);
-                        var companionType = CompanionStarDatabase.GetCompanionStellarType(mass, star.Seed, companionLetter);
+                        var (mass, separationAU, _) = MultipleStarSystems.GetCompanionProperties(star.Seed, star.Mass, companionLetter);
+                        var companionType = MultipleStarSystems.GetCompanionStellarType(mass, star.Seed, companionLetter);
                         Console.WriteLine($"  Companion type: {companionType}");
                         Console.WriteLine($"  Companion mass: {mass:F2} solar masses");
                         Console.WriteLine($"  Separation: {separationAU:F1} AU");
@@ -504,7 +506,7 @@ public class ScientificMilkyWayConsole
                     if (isPlanet)
                     {
                         // Generate the multiple star system to get companion's planetary system
-                        var multipleSystem = CompanionStarSystem.GenerateMultipleStarSystem(star);
+                        var multipleSystem = MultipleStarSystems.GenerateMultipleStarSystem(star);
                         var companion = multipleSystem.Companions.FirstOrDefault(c => c.Designation == companionLetter);
                         
                         if (companion?.PlanetarySystem != null)
@@ -603,7 +605,7 @@ public class ScientificMilkyWayConsole
                         Console.WriteLine($"  Multiple System: Yes");
                         
                         // Generate the complete multiple star system with planetary systems
-                        var multipleSystem = CompanionStarSystem.GenerateMultipleStarSystem(star);
+                        var multipleSystem = MultipleStarSystems.GenerateMultipleStarSystem(star);
                         Console.WriteLine($"  Companion stars: {multipleSystem.Companions.Count}");
                         
                         foreach (var companion in multipleSystem.Companions)

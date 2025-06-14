@@ -11,8 +11,8 @@ public class ScientificMilkyWayGenerator
     // Galaxy Structure Parameters (based on 2024 data)
     private const long TOTAL_STARS = 100_000_000_000L; // 100 billion stars
     private const float GALAXY_RADIUS = 60_000f; // light years
-    private const float BULGE_RADIUS = 10_000f; // Central bulge/bar radius
-    private const float BULGE_SCALE_HEIGHT = 2_000f; // Bulge vertical scale
+    private const float BULGE_RADIUS = 5_000f; // Central bulge/bar radius (peanut shape extends to ~1.5kpc)
+    private const float BULGE_SCALE_HEIGHT = 1400f; // Bulge vertical scale (peanut shape extends vertically)
     private const float BAR_LENGTH = 10_000f; // Central bar full length
     private const float BAR_WIDTH = 3_000f; // Bar width
     private const float BAR_ANGLE = 0.44f; // ~25 degrees from x-axis
@@ -147,7 +147,7 @@ public class ScientificMilkyWayGenerator
         var planetarySystem = planetarySystemGen.GeneratePlanetarySystem(seed, type, mass, $"Star-{seed}");
         
         // Check for companions using global database
-        var (isMultiple, companionCount, companions) = CompanionStarDatabase.GetCompanionInfo(seed, type);
+        var (isMultiple, companionCount, companions) = MultipleStarSystems.GetCompanionInfo(seed, type);
         
         return new Star
         {
@@ -162,7 +162,7 @@ public class ScientificMilkyWayGenerator
             Region = DetermineRegion(position),
             PlanetCount = planetarySystem.Planets.Count,
             IsMultiple = isMultiple,
-            SystemName = CompanionStarDatabase.GetSystemName(seed, type)
+            SystemName = MultipleStarSystems.GetSystemName(seed, type)
         };
     }    
     private Vector3 GeneratePositionByDensity(long seed)
@@ -224,16 +224,22 @@ public class ScientificMilkyWayGenerator
     private float CalculateBulgeDensity(Vector3 position)
     {
         var r = position.Length();
-        if (r > BULGE_RADIUS) return 0;
         
-        // Hernquist profile for bulge
-        var a = BULGE_RADIUS * 0.5f;
-        var density = 1.0f / (r / a * Math.Pow(1 + r / a, 3));
+        // Power law profile similar to Hernquist but smoother
+        // This gives a nice 1/r^2 to 1/r^3 falloff
+        var density = Math.Pow(1 + r / 1500, -2.8);
         
-        // Vertical flattening
-        var zScale = 1.0f - 0.5f * Math.Abs(position.Z) / BULGE_SCALE_HEIGHT;
+        // Smooth exponential cutoff for large radii
+        if (r > BULGE_RADIUS * 0.7f)
+        {
+            density *= Math.Exp(-Math.Pow((r - BULGE_RADIUS * 0.7f) / (BULGE_RADIUS * 0.5f), 2));
+        }
         
-        return (float)(density * zScale * 0.3);
+        // Vertical flattening for peanut shape
+        var z = Math.Abs(position.Z);
+        var zScale = Math.Exp(-z * z / (2 * BULGE_SCALE_HEIGHT * BULGE_SCALE_HEIGHT));
+        
+        return (float)(density * zScale * 0.5);
     }    
     private float CalculateBarDensity(Vector3 position)
     {
@@ -253,23 +259,28 @@ public class ScientificMilkyWayGenerator
         barDensity *= (float)Math.Exp(-Math.Pow(yBar / (BAR_WIDTH * 0.3), 2));
         
         // Vertical profile
-        barDensity *= (float)Math.Exp(-Math.Abs(zBar) / 500);
+        barDensity *= (float)Math.Exp(-Math.Abs(zBar) / 800);
         
-        return barDensity * 0.4f;
+        return barDensity * 0.5f;
     }
     
     private float CalculateDiskDensity(float r, float z)
     {
-        if (r > DISK_CUTOFF_RADIUS) return 0;
-        
-        // Exponential radial profile
+        // Smoother exponential radial profile with gradual cutoff
         var radialProfile = (float)Math.Exp(-r / DISK_SCALE_RADIUS);
+        
+        // Additional smooth cutoff for outer regions
+        if (r > DISK_CUTOFF_RADIUS * 0.8f)
+        {
+            var cutoffFactor = Math.Exp(-Math.Pow((r - DISK_CUTOFF_RADIUS * 0.8f) / (DISK_CUTOFF_RADIUS * 0.2f), 2));
+            radialProfile *= (float)cutoffFactor;
+        }
         
         // Two-component vertical profile (thin + thick disk)
         var thinDisk = 0.85f * (float)Math.Exp(-z / THIN_DISK_HEIGHT);
         var thickDisk = 0.15f * (float)Math.Exp(-z / THICK_DISK_HEIGHT);
         
-        return radialProfile * (thinDisk + thickDisk) * 0.5f;
+        return radialProfile * (thinDisk + thickDisk) * 0.4f;
     }    
     private float CalculateHaloDensity(float r)
     {
@@ -342,14 +353,14 @@ public class ScientificMilkyWayGenerator
             var theta = 2 * Math.PI * u;
             var phi = Math.Acos(2 * v - 1);
             
-            // Hernquist profile sampling
-            var q = rng.NextDouble();
-            var r = BULGE_RADIUS * 0.5f * (float)(Math.Sqrt(q) / (1 - Math.Sqrt(q)));
+            // Hernquist profile sampling with cutoff to avoid extreme values
+            var q = rng.NextDouble() * 0.95; // Limit q to avoid singularity
+            var r = BULGE_RADIUS * 0.3f * (float)(Math.Sqrt(q) / (1 - Math.Sqrt(q)));
             
             // Flattened in Z
             var x = r * (float)(Math.Sin(phi) * Math.Cos(theta));
             var y = r * (float)(Math.Sin(phi) * Math.Sin(theta));
-            var z = r * (float)Math.Cos(phi) * 0.4f; // Flattening factor
+            var z = r * (float)Math.Cos(phi) * 0.7f; // Less flattening for more vertical extent
             
             return new Vector3(x, y, z);
         }
@@ -358,7 +369,7 @@ public class ScientificMilkyWayGenerator
             // Bar structure
             var x = (rng.NextDouble() - 0.5) * BAR_LENGTH;
             var y = (rng.NextDouble() - 0.5) * BAR_WIDTH;
-            var z = (float)NextGaussian(rng, 0, 300);
+            var z = (float)NextGaussian(rng, 0, 600);
             
             // Rotate to bar angle
             var xRot = x * (float)Math.Cos(BAR_ANGLE) - y * (float)Math.Sin(BAR_ANGLE);
@@ -474,97 +485,70 @@ public class ScientificMilkyWayGenerator
         // Check for special objects in central region
         if (population == StellarPopulation.Bulge && position.Length() < 100)
         {
-            if (roll < 0.1) return StellarType.BH;
-            if (roll < 0.3) return StellarType.NS;
+            // Higher concentration of compact objects near galactic center
+            if (roll < 0.001) return StellarType.BH;    // 0.1% black holes
+            if (roll < 0.005) return StellarType.NS;    // 0.4% neutron stars
         }
         
         // Population-specific distributions based on metallicity and age
         switch (population)
         {
             case StellarPopulation.Halo:
-                // Old, metal-poor population
-                if (roll < 0.0001) return StellarType.B0V;
-                if (roll < 0.001) return StellarType.A0V;
-                if (roll < 0.005) return StellarType.F0V;
-                if (roll < 0.025) return StellarType.G5V;
-                if (roll < 0.12) return StellarType.K5V;
-                if (roll < 0.75) return StellarType.M5V;
-                if (roll < 0.85) return StellarType.DA;
-                if (roll < 0.95) return StellarType.K0III;
-                // Reduce neutron star probability in outer disc
-                if (isOuterDisc && roll < 0.975) return StellarType.K0III;
-                return StellarType.NS;
+                // Old, metal-poor population - no massive stars left
+                if (roll < 0.00001) return StellarType.B0V;     // 0.001% - extremely rare
+                if (roll < 0.0001) return StellarType.A0V;      // 0.009%
+                if (roll < 0.002) return StellarType.F0V;       // 0.19%
+                if (roll < 0.05) return StellarType.G5V;        // 4.8%
+                if (roll < 0.17) return StellarType.K5V;        // 12%
+                if (roll < 0.75) return StellarType.M5V;        // 58% - lower mass stars dominate old populations
+                if (roll < 0.90) return StellarType.K0III;      // 15% - red giants common in old populations
+                if (roll < 0.98) return StellarType.DA;         // 8% - many white dwarfs from evolved stars
+                if (roll < 0.99995) return StellarType.NS;      // 0.195% - neutron stars
+                return StellarType.BH;                           // 0.005% - black holes
                 
             case StellarPopulation.ThickDisk:
                 // Intermediate age population
-                if (roll < 0.0002) return StellarType.B0V;
-                if (roll < 0.002) return StellarType.A0V;
-                if (roll < 0.01) return StellarType.F0V;
-                if (roll < 0.04) return StellarType.G5V;
-                if (roll < 0.15) return StellarType.K5V;
-                if (roll < 0.77) return StellarType.M5V;
-                if (roll < 0.85) return StellarType.DA;
-                if (roll < 0.92) return StellarType.K0III;
-                // Adjust neutron star probability for outer disc
-                if (isOuterDisc)
-                {
-                    if (roll < 0.96) return StellarType.K0III;
-                    if (roll < 0.99) return StellarType.NS;
-                }
-                else
-                {
-                    if (roll < 0.98) return StellarType.NS;
-                }
-                return StellarType.BH;                
+                if (roll < 0.00005) return StellarType.B0V;     // 0.005%
+                if (roll < 0.0006) return StellarType.A0V;      // 0.055%
+                if (roll < 0.015) return StellarType.F0V;       // 1.44%
+                if (roll < 0.08) return StellarType.G5V;        // 6.5%
+                if (roll < 0.19) return StellarType.K5V;        // 11%
+                if (roll < 0.82) return StellarType.M5V;        // 63%
+                if (roll < 0.90) return StellarType.K0III;      // 8% - red giants
+                if (roll < 0.97) return StellarType.DA;         // 7% - white dwarfs
+                if (roll < 0.9998) return StellarType.NS;       // 0.28% - neutron stars
+                return StellarType.BH;                           // 0.02% - black holes                
             case StellarPopulation.ThinDisk:
                 // Check if in spiral arm for star formation
                 var spiralBoost = CalculateSpiralArmDensity(position) - 1.0f;
                 
-                // Young population in spiral arms
-                if (spiralBoost > 0.2 && roll < 0.001 * (1 + spiralBoost))
-                    return StellarType.O5V;
-                if (roll < 0.0003 + 0.001 * spiralBoost) return StellarType.O5V;
-                if (roll < 0.0013 + 0.003 * spiralBoost) return StellarType.B0V;
-                if (roll < 0.006 + 0.006 * spiralBoost) return StellarType.A0V;
-                if (roll < 0.03 + 0.01 * spiralBoost) return StellarType.F0V;
-                if (roll < 0.076) return StellarType.G5V;
-                if (roll < 0.121) return StellarType.K5V;
-                if (roll < 0.885) return StellarType.M5V;
-                if (roll < 0.92) return StellarType.DA;
-                if (roll < 0.95) return StellarType.K0III;
-                // Adjust neutron star probability for outer disc
-                if (isOuterDisc)
-                {
-                    if (roll < 0.97) return StellarType.K0III;
-                    if (roll < 0.995) return StellarType.NS;
-                }
-                else
-                {
-                    if (roll < 0.99) return StellarType.NS;
-                }
-                return StellarType.BH;
+                // Young population in spiral arms - massive stars more common
+                if (spiralBoost > 0.2 && roll < 0.0001 * (1 + spiralBoost * 2))
+                    return StellarType.O5V;                      // O-type very rare even in star forming regions
+                if (roll < 0.00003 + 0.00007 * spiralBoost) return StellarType.O5V;   // ~0.003-0.01%
+                if (roll < 0.0013 + 0.0007 * spiralBoost) return StellarType.B0V;     // ~0.13-0.2%
+                if (roll < 0.006 + 0.002 * spiralBoost) return StellarType.A0V;       // ~0.6-0.8%
+                if (roll < 0.03 + 0.01 * spiralBoost) return StellarType.F0V;         // ~3-4%
+                if (roll < 0.106) return StellarType.G5V;       // 7.6%
+                if (roll < 0.227) return StellarType.K5V;       // 12.1%
+                if (roll < 0.9915) return StellarType.M5V;      // 76.45%
+                if (roll < 0.994) return StellarType.K0III;     // 0.25% - fewer evolved stars in young pop
+                if (roll < 0.999) return StellarType.DA;        // 0.5% - white dwarfs
+                if (roll < 0.99998) return StellarType.NS;      // 0.08% - neutron stars
+                return StellarType.BH;                           // 0.002% - black holes
                 
             case StellarPopulation.Bulge:
                 // Old, metal-rich population
-                if (roll < 0.0001) return StellarType.B0V;
-                if (roll < 0.001) return StellarType.A0V;
-                if (roll < 0.008) return StellarType.F0V;
-                if (roll < 0.045) return StellarType.G5V;
-                if (roll < 0.16) return StellarType.K5V;
-                if (roll < 0.70) return StellarType.M5V;
-                if (roll < 0.80) return StellarType.DA;
-                if (roll < 0.90) return StellarType.K0III;
-                // Bulge population rarely extends beyond 15000 ly, but adjust just in case
-                if (isOuterDisc)
-                {
-                    if (roll < 0.935) return StellarType.K0III;
-                    if (roll < 0.985) return StellarType.NS;
-                }
-                else
-                {
-                    if (roll < 0.97) return StellarType.NS;
-                }
-                return StellarType.BH;
+                if (roll < 0.00002) return StellarType.B0V;     // 0.002% - very rare
+                if (roll < 0.0002) return StellarType.A0V;      // 0.018%
+                if (roll < 0.005) return StellarType.F0V;       // 0.48%
+                if (roll < 0.06) return StellarType.G5V;        // 5.5%
+                if (roll < 0.16) return StellarType.K5V;        // 10%
+                if (roll < 0.68) return StellarType.M5V;        // 52% - lower due to more evolved stars
+                if (roll < 0.80) return StellarType.K0III;      // 12% - many red giants in old bulge
+                if (roll < 0.92) return StellarType.DA;         // 12% - many white dwarfs
+                if (roll < 0.9995) return StellarType.NS;       // 0.75% - higher in dense bulge
+                return StellarType.BH;                           // 0.05% - slightly higher near center
                 
             default:
                 // Default to M dwarf
@@ -710,7 +694,7 @@ public class ScientificMilkyWayGenerator
         var planetarySystem = planetarySystemGen.GeneratePlanetarySystem(seed, stellarType, mass, $"Star-{seed}");
         
         // Check for companions using global database
-        var (isMultiple, companionCount, companions) = CompanionStarDatabase.GetCompanionInfo(seed, stellarType);
+        var (isMultiple, companionCount, companions) = MultipleStarSystems.GetCompanionInfo(seed, stellarType);
         
         return new Star
         {
@@ -725,7 +709,7 @@ public class ScientificMilkyWayGenerator
             Region = DetermineRegion(position),
             PlanetCount = planetarySystem.Planets.Count,
             IsMultiple = isMultiple,
-            SystemName = CompanionStarDatabase.GetSystemName(seed, stellarType)
+            SystemName = MultipleStarSystems.GetSystemName(seed, stellarType)
         };
     }
     
@@ -796,14 +780,6 @@ public class ScientificMilkyWayGenerator
         // Far regions
         if (z > 5000) return "Galactic Halo";
         return "Far Outer Disk";
-    }
-    
-    /// <summary>
-    /// Generate stellar type based on population and random distribution
-    /// </summary>
-    private StellarType GenerateStellarType(Random rng, StellarPopulation population)
-    {
-        return GenerateStellarType(rng, population, Vector3.Zero);
     }
     
     private StellarType GenerateStellarType(Random rng, StellarPopulation population, Vector3 position)

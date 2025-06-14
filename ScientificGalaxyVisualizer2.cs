@@ -10,6 +10,7 @@ public class ScientificGalaxyVisualizer2
 {
     private readonly ScientificMilkyWayGenerator generator;
     private readonly Random random = new Random();
+    private float zExaggeration = 5.0f; // Default Z exaggeration for side view
     
     public ScientificGalaxyVisualizer2(ScientificMilkyWayGenerator generator)
     {
@@ -36,39 +37,28 @@ public class ScientificGalaxyVisualizer2
             var r = random.NextDouble() * 10000; // 0 to 10,000 ly
             var theta = random.NextDouble() * 2 * Math.PI;
             
-            // Calculate density at this radius using smooth composite model
+            // Calculate density at this radius using smooth power law
             double density;
             
-            // Core component (dominates < 500 ly)
-            var coreDensity = Math.Exp(-Math.Pow(r / 500, 0.5));
+            // Multi-component model with smooth transitions
+            // Core region - high density, steep falloff
+            var coreDensity = Math.Pow(1 + r / 500, -3.0);
             
-            // Bulge component (dominates 500-3000 ly)  
-            var bulgeDensity = 0.8 * Math.Exp(-Math.Pow(r / 2500, 0.7));
+            // Bulge component - moderate density, less steep
+            var bulgeDensity = 0.3 * Math.Pow(1 + r / 2000, -2.5);
             
-            // Disk component (dominates > 3000 ly)
-            var diskDensity = 0.3 * Math.Exp(-(r - 2000) / 4000);
+            // Disk component - lower density, shallow falloff
+            var diskDensity = 0.1 * Math.Pow(1 + r / 5000, -1.5) * Math.Exp(-r / 20000);
             
-            // Combine with smooth weighting
-            if (r < 300)
-            {
-                density = coreDensity;
-            }
-            else if (r < 1500)
-            {
-                // Smooth blend between core and bulge
-                var t = (r - 300) / 1200;
-                density = coreDensity * (1 - t) + bulgeDensity * t;
-            }
-            else if (r < 5000)
-            {
-                // Smooth blend between bulge and disk
-                var t = (r - 1500) / 3500;
-                density = bulgeDensity * (1 - t) + diskDensity * t;
-            }
-            else
-            {
-                density = diskDensity;
-            }
+            // Smooth blending between components
+            var coreWeight = Math.Exp(-r / 1500);
+            var bulgeWeight = Math.Exp(-r / 5000) * (1 - coreWeight * 0.7);
+            var diskWeight = 1 - Math.Exp(-r / 3000);
+            
+            // Combine with smooth weights
+            density = coreDensity * coreWeight + 
+                     bulgeDensity * bulgeWeight + 
+                     diskDensity * diskWeight;
             
             // Normalize density to [0,1] range
             density = Math.Min(1.0, density);
@@ -82,14 +72,14 @@ public class ScientificGalaxyVisualizer2
                 
                 if (flatteningFactor < 0.5)
                 {
-                    // More spherical distribution
-                    var phi = Math.Acos(2 * random.NextDouble() - 1);
-                    z = r * Math.Cos(phi) * (1 - flatteningFactor);
+                    // More spherical distribution but with proper scale height
+                    var maxZ = Math.Min(r * 0.5, 1400); // Increased vertical extent for bulge
+                    z = (2 * random.NextDouble() - 1) * maxZ * (1 - flatteningFactor);
                 }
                 else
                 {
                     // Disk-like distribution
-                    var scaleHeight = 500 * Math.Exp(-r / 8000) + 100;
+                    var scaleHeight = 300 * Math.Exp(-r / 8000) + 100;
                     z = random.NextGaussian() * scaleHeight;
                 }
                 
@@ -219,8 +209,9 @@ public class ScientificGalaxyVisualizer2
         return angle;
     }
     
-    public void GenerateAllViews(int width = 2048, int height = 2048, int starCount = 500000)
+    public void GenerateAllViews(int width = 2048, int height = 2048, int starCount = 500000, float zExaggeration = 5.0f)
     {
+        this.zExaggeration = zExaggeration;
         var stars = GenerateDensityBasedStars(starCount);
         
         GenerateTopView(stars, width, height);
@@ -463,12 +454,19 @@ public class ScientificGalaxyVisualizer2
     
     private double CalculateDensity(double r)
     {
-        // Composite density model
-        var coreDensity = 1e6 * Math.Exp(-r / 200); // Very dense core
-        var bulgeDensity = 1e4 * Math.Pow(1 + r / 1000, -3.5); // Hernquist profile
-        var diskDensity = 100 * Math.Exp(-r / 8300); // Exponential disk
+        // Power law components matching the sampling
+        var coreDensity = 1e5 * Math.Pow(1 + r / 500, -3.0);
+        var bulgeDensity = 3e4 * Math.Pow(1 + r / 2000, -2.5);
+        var diskDensity = 1e4 * Math.Pow(1 + r / 5000, -1.5) * Math.Exp(-r / 20000);
         
-        return coreDensity + bulgeDensity + diskDensity;
+        // Smooth blending
+        var coreWeight = Math.Exp(-r / 1500);
+        var bulgeWeight = Math.Exp(-r / 5000) * (1 - coreWeight * 0.7);
+        var diskWeight = 1 - Math.Exp(-r / 3000);
+        
+        return coreDensity * coreWeight + 
+               bulgeDensity * bulgeWeight + 
+               diskDensity * diskWeight;
     }
     
     private void DrawGalaxyInfo(SKCanvas canvas, string viewName, int width, int height, int starCount)
@@ -503,7 +501,7 @@ public class ScientificGalaxyVisualizer2
                 return new ScientificMilkyWayGenerator.Vector3(point.X, point.Y, 0);
                 
             case ViewProjection.Side:
-                return new ScientificMilkyWayGenerator.Vector3(point.X, point.Z * 10, 0); // Exaggerate Z
+                return new ScientificMilkyWayGenerator.Vector3(point.X, point.Z * zExaggeration, 0); // Configurable Z exaggeration
                 
             case ViewProjection.Angled3D:
                 // Rotate around X axis by 45 degrees, then around Z by 30 degrees
