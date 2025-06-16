@@ -421,72 +421,120 @@ public static class GalaxyGenerator
     {
         var r = position.Length2D();
         
-        // Different regions have different density mappings
-        // The normalized density already includes the exponential falloff,
-        // so we just need to scale it to the right stellar density
+        // Piecewise function with smooth transitions between all observational data points
+        float baseDensity;
         
-        if (r < 130)
+        if (r <= 100)
         {
-            // Galactic center - 40 parsecs (130 ly) radius
-            // Peak density ~288 stars/ly³
-            return normalizedDensity * 288f;
+            // 0 to 100 ly: Linear interpolation from 288 to 100
+            float t = r / 100f;
+            baseDensity = 288f + t * (100f - 288f);
         }
-        else if (r < 6000)
+        else if (r <= 500)
         {
-            // Bulge region - multi-phase exponential decay
-            // At r=130 ly: ~288 stars/ly³
-            // At r=326 ly (100 pc): ~2.9 stars/ly³
-            // At r=1000 ly: ~0.1-0.5 stars/ly³ (transition region)
-            // At r=6000 ly: ~0.006 stars/ly³ (disk average)
-            
-            float scaleFactor;
-            
-            if (r < 326)
-            {
-                // Inner bulge: steep decay from 288 to 2.9
-                scaleFactor = 288f * (float)Math.Exp(-(r - 130f) / 85f);
-            }
-            else if (r < 2000)
-            {
-                // Middle bulge: smooth decay from 2.9 to ~0.3
-                var t = (r - 326f) / (2000f - 326f);
-                scaleFactor = 2.9f * (float)Math.Exp(-t * 2.5f);
-            }
-            else
-            {
-                // Outer bulge: smooth transition to disk
-                // At r=2000: ~0.3 stars/ly³
-                // At r=6000: ~0.01 stars/ly³ (slightly higher than disk average)
-                var t = (r - 2000f) / (6000f - 2000f);
-                scaleFactor = 0.3f * (float)Math.Exp(-t * 3.5f);
-            }
-            
-            return normalizedDensity * scaleFactor;
+            // 100 to 500 ly: Power law interpolation from 100 to 5
+            // Using power law: density = a * r^b where we solve for a and b
+            float logR1 = (float)Math.Log(100);
+            float logR2 = (float)Math.Log(500);
+            float logD1 = (float)Math.Log(100);
+            float logD2 = (float)Math.Log(5);
+            float b = (logD2 - logD1) / (logR2 - logR1); // ≈ -1.86
+            float a = (float)Math.Exp(logD1 - b * logR1);
+            baseDensity = a * (float)Math.Pow(r, b);
         }
-        else if (r < 50000)
+        else if (r <= 1000)
         {
-            // Disk region
-            // Average disk density: 0.006 stars/ly³
-            // Solar neighborhood (26000 ly): 0.004 stars/ly³
-            // The normalized density already handles the exponential decay
-            
-            // Base disk scaling to achieve average of 0.006 stars/ly³
-            float scaleFactor = 0.006f / 0.001f; // Assuming normalized disk density ~0.001
-            
-            // Slight adjustment for solar neighborhood
-            if (Math.Abs(r - 26000) < 2000)
-            {
-                // Solar neighborhood gets 0.004 instead of 0.006
-                scaleFactor *= 0.004f / 0.006f;
-            }
-            
-            return normalizedDensity * scaleFactor;
+            // 500 to 1000 ly: Exponential interpolation from 5 to 1
+            float t = (r - 500f) / 500f;
+            baseDensity = 5f * (float)Math.Exp(t * Math.Log(0.2f));
+        }
+        else if (r <= 2500)
+        {
+            // 1000 to 2500 ly: Exponential from 1 to 0.2
+            float t = (r - 1000f) / 1500f;
+            baseDensity = 1f * (float)Math.Exp(t * Math.Log(0.2f));
+        }
+        else if (r <= 5000)
+        {
+            // 2500 to 5000 ly: Exponential from 0.2 to 0.04
+            float t = (r - 2500f) / 2500f;
+            baseDensity = 0.2f * (float)Math.Exp(t * Math.Log(0.2f));
+        }
+        else if (r <= 6000)
+        {
+            // 5000 to 6000 ly: Linear from 0.04 to 0.03
+            float t = (r - 5000f) / 1000f;
+            baseDensity = 0.04f + t * (0.03f - 0.04f);
+        }
+        else if (r <= 15000)
+        {
+            // 6000 to 15000 ly: Exponential from 0.03 to 0.01
+            float t = (r - 6000f) / 9000f;
+            baseDensity = 0.03f * (float)Math.Exp(t * Math.Log(0.01f / 0.03f));
+        }
+        else if (r <= 20000)
+        {
+            // 15000 to 20000 ly: Exponential from 0.01 to 0.007
+            float t = (r - 15000f) / 5000f;
+            baseDensity = 0.01f * (float)Math.Exp(t * Math.Log(0.7f));
+        }
+        else if (r <= 26000)
+        {
+            // 20000 to 26000 ly: Exponential from 0.007 to 0.004
+            float t = (r - 20000f) / 6000f;
+            baseDensity = 0.007f * (float)Math.Exp(t * Math.Log(0.004f / 0.007f));
+        }
+        else if (r <= 30000)
+        {
+            // 26000 to 30000 ly: Exponential from 0.004 to 0.003
+            float t = (r - 26000f) / 4000f;
+            baseDensity = 0.004f * (float)Math.Exp(t * Math.Log(0.75f));
+        }
+        else if (r <= 40000)
+        {
+            // 30000 to 40000 ly: Exponential from 0.003 to 0.001
+            float t = (r - 30000f) / 10000f;
+            baseDensity = 0.003f * (float)Math.Exp(t * Math.Log(0.001f / 0.003f));
+        }
+        else if (r <= 50000)
+        {
+            // 40000 to 50000 ly: Exponential from 0.001 to 0.0005
+            float t = (r - 40000f) / 10000f;
+            baseDensity = 0.001f * (float)Math.Exp(t * Math.Log(0.5f));
+        }
+        else if (r <= 80000)
+        {
+            // 50000 to 80000 ly: Exponential from 0.0005 to 0.00005
+            float t = (r - 50000f) / 30000f;
+            baseDensity = 0.0005f * (float)Math.Exp(t * Math.Log(0.1f));
         }
         else
         {
-            // Far outer regions and halo
-            // Very low density - 10^-6 of solar neighborhood
-            return normalizedDensity * 0.000004f;
+            // Beyond 80000 ly: Continue exponential decay
+            float decayRate = (float)Math.Log(0.1f) / 30000f; // Same rate as 50k-80k
+            baseDensity = 0.00005f * (float)Math.Exp((r - 80000f) * decayRate);
+        }
+        
+        // Apply normalized density to account for local variations (spiral arms, etc.)
+        if (r < 6000)
+        {
+            // In bulge: direct scaling
+            return normalizedDensity * baseDensity;
+        }
+        else
+        {
+            // In disk: account for spiral arm enhancements
+            float expectedNormalizedDisk = 0.1f * (float)Math.Exp(-(r - 6000f) / 3500f);
+            if (expectedNormalizedDisk > 0.00001f)
+            {
+                float enhancementFactor = normalizedDensity / expectedNormalizedDisk;
+                return baseDensity * enhancementFactor;
+            }
+            else
+            {
+                // Far outer regions
+                return baseDensity * normalizedDensity * 10f;
+            }
         }
     }
     
