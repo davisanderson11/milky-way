@@ -7,19 +7,29 @@ if %ERRORLEVEL% EQU 0 (
     echo Using .NET SDK...
     
     REM Clean up any existing project
-    if exist ScientificMilkyWayVisual rmdir /s /q ScientificMilkyWayVisual
+    if exist ScientificMilkyWayVisual (
+        echo Cleaning up existing project...
+        rmdir /s /q ScientificMilkyWayVisual
+        timeout /t 1 /nobreak >nul
+    )
     
     REM Create new console project
     dotnet new console -n ScientificMilkyWayVisual -f net8.0 --force
+    
+    REM Clean up any leftover files that shouldn't exist
+    if exist ScientificMilkyWayVisual\GalaxyChunkSystem.cs del /F /Q ScientificMilkyWayVisual\GalaxyChunkSystem.cs
     
     REM Copy source files
     copy /Y ScientificMilkyWayConsole.cs ScientificMilkyWayVisual\Program.cs
     copy /Y ScientificMilkyWayGenerator.cs ScientificMilkyWayVisual\
     copy /Y ScientificGalaxyVisualizer2.cs ScientificMilkyWayVisual\
     copy /Y GalacticAnalytics.cs ScientificMilkyWayVisual\
-    copy /Y GalaxyChunkSystem.cs ScientificMilkyWayVisual\
+    copy /Y ChunkBasedGalaxySystem.cs ScientificMilkyWayVisual\
     copy /Y MultipleStarSystems.cs ScientificMilkyWayVisual\
     copy /Y PlanetarySystemGenerator.cs ScientificMilkyWayVisual\
+    copy /Y GalaxyGenerator.cs ScientificMilkyWayVisual\
+    copy /Y ChunkVisualizer.cs ScientificMilkyWayVisual\
+    copy /Y SkyGenerator.cs ScientificMilkyWayVisual\
     
     REM Add SkiaSharp package
     cd ScientificMilkyWayVisual

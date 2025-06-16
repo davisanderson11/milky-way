@@ -5,7 +5,7 @@ using System.Linq;
 
 /// <summary>
 /// Galaxy chunk system with fixed 100 ly chunks
-/// No star count limits - density handled naturally
+/// Uses unified GalaxyGenerator for all density and position calculations
 /// </summary>
 public class GalaxyChunkSystem
 {
@@ -27,9 +27,9 @@ public class GalaxyChunkSystem
     /// </summary>
     public class ChunkCoordinate
     {
-        public int R { get; set; }      // 0-599
+        public int R { get; set; }      // 0-9999
         public int Theta { get; set; }  // 0-359
-        public int Z { get; set; }      // -50 to 50
+        public int Z { get; set; }      // -500 to 500
         
         public ChunkCoordinate(int r, int theta, int z)
         {
@@ -62,6 +62,95 @@ public class GalaxyChunkSystem
             
             return (rMin, rMax, thetaMin, thetaMax, zMin, zMax);
         }
+        
+        /// <summary>
+        /// Get the center position of this chunk in Cartesian coordinates
+        /// </summary>
+        public GalaxyGenerator.Vector3 GetCenterPosition()
+        {
+            var bounds = GetBounds();
+            double centerR = (bounds.rMin + bounds.rMax) / 2;
+            double centerTheta = (bounds.thetaMin + bounds.thetaMax) / 2;
+            double centerZ = (bounds.zMin + bounds.zMax) / 2;
+            
+            float x = (float)(centerR * Math.Cos(centerTheta));
+            float y = (float)(centerR * Math.Sin(centerTheta));
+            float z = (float)centerZ;
+            
+            return new GalaxyGenerator.Vector3(x, y, z);
+        }
+        
+        /// <summary>
+        /// Calculate volume of this chunk
+        /// </summary>
+        public double GetVolume()
+        {
+            var bounds = GetBounds();
+            double deltaTheta = bounds.thetaMax - bounds.thetaMin;
+            double deltaR = bounds.rMax - bounds.rMin;
+            double deltaZ = bounds.zMax - bounds.zMin;
+            
+            if (R == 0)
+            {
+                // Volume of a wedge from r=0 to r=deltaR
+                return 0.5 * deltaTheta * deltaR * deltaR * deltaZ;
+            }
+            else
+            {
+                // Standard cylindrical wedge volume
+                double avgRadius = (bounds.rMin + bounds.rMax) / 2;
+                return avgRadius * deltaR * deltaTheta * deltaZ;
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Get a star by its seed (position-based)
+    /// </summary>
+    public ScientificMilkyWayGenerator.Star GetStarBySeed(long seed)
+    {
+        // Just pass through to base generator which uses position-based seeds
+        return baseGenerator.GetStarBySeed(seed);
+    }
+    
+    /// <summary>
+    /// Check if a seed is chunk-encoded
+    /// </summary>
+    private bool IsChunkEncodedSeed(long seed)
+    {
+        // Chunk-encoded seeds have specific bit patterns
+        // Check if the upper bits match our encoding pattern
+        int chunkR = (int)((seed >> 39) & 0x3FFF);
+        int chunkTheta = (int)((seed >> 30) & 0x1FF);
+        int normalizedZ = (int)((seed >> 20) & 0x3FF);
+        
+        return chunkR < MAX_RADIUS_CHUNKS && 
+               chunkTheta < MAX_ANGULAR_CHUNKS && 
+               normalizedZ < MAX_Z_CHUNKS;
+    }
+    
+    /// <summary>
+    /// Get a star using chunk encoding
+    /// </summary>
+    private ScientificMilkyWayGenerator.Star GetStarByChunkEncoding(long encodedSeed)
+    {
+        // Decode the seed
+        var (chunkR, chunkTheta, chunkZ, starIndex) = DecodeSeed(encodedSeed);
+        
+        // Get chunk and calculate position
+        var chunk = new ChunkCoordinate(chunkR, chunkTheta, chunkZ);
+        var bounds = chunk.GetBounds();
+        
+        // Generate stars in this chunk
+        var starsInChunk = GenerateChunkStars(chunk.ToString());
+        
+        // Return the requested star
+        if (starIndex >= 0 && starIndex < starsInChunk.Count)
+        {
+            return starsInChunk[starIndex];
+        }
+        
+        throw new ArgumentException($"Star index {starIndex} not found in chunk {chunk}");
     }
     
     /// <summary>
@@ -105,137 +194,7 @@ public class GalaxyChunkSystem
     }
     
     /// <summary>
-    /// Get a star by its seed
-    /// </summary>
-    public ScientificMilkyWayGenerator.Star GetStarBySeed(long seed)
-    {
-        // Special case for Sagittarius A*
-        if (seed == 0)
-        {
-            return baseGenerator.GetStarBySeed(0);
-        }
-        
-        // Decode the seed
-        var (chunkR, chunkTheta, chunkZ, starIndex) = DecodeSeed(seed);
-        
-        // Get chunk bounds
-        var chunk = new ChunkCoordinate(chunkR, chunkTheta, chunkZ);
-        var bounds = chunk.GetBounds();
-        
-        // Calculate expected stars in this chunk
-        int expectedStars = CalculateExpectedStars(chunk);
-        
-        // If star index exceeds expected stars, it doesn't exist
-        if (starIndex >= expectedStars)
-        {
-            throw new ArgumentException($"Star index {starIndex} exceeds expected stars ({expectedStars}) in chunk {chunk}");
-        }
-        
-        // Generate deterministic position within chunk
-        var rng = new Random((int)(seed & 0x7FFFFFFF));
-        
-        // Use stratified sampling for even distribution
-        int strata = (int)Math.Ceiling(Math.Pow(expectedStars, 1.0/3.0));
-        int strataIndex = starIndex % (strata * strata * strata);
-        
-        int rStrata = strataIndex / (strata * strata);
-        int thetaStrata = (strataIndex / strata) % strata;
-        int zStrata = strataIndex % strata;
-        
-        // Generate position within stratum
-        double r = bounds.rMin + (bounds.rMax - bounds.rMin) * ((rStrata + rng.NextDouble()) / strata);
-        double theta = bounds.thetaMin + (bounds.thetaMax - bounds.thetaMin) * ((thetaStrata + rng.NextDouble()) / strata);
-        double z = bounds.zMin + (bounds.zMax - bounds.zMin) * ((zStrata + rng.NextDouble()) / strata);
-        
-        // Convert to Cartesian
-        float x = (float)(r * Math.Cos(theta));
-        float y = (float)(r * Math.Sin(theta));
-        var position = new ScientificMilkyWayGenerator.Vector3(x, y, (float)z);
-        
-        // Generate star properties based on position
-        var population = baseGenerator.DeterminePopulation(position);
-        var type = baseGenerator.DetermineStellarType(position, population, seed);
-        var properties = baseGenerator.GetStellarProperties(type);
-        var mass = properties.mass * (0.8f + 0.4f * (float)rng.NextDouble());
-        
-        // Generate planetary system
-        var planetarySystemGen = new PlanetarySystemGenerator();
-        var planetarySystem = planetarySystemGen.GeneratePlanetarySystem(seed, type, mass, $"Star-{seed}");
-        
-        // Check for companions
-        var (isMultiple, companionCount, companions) = MultipleStarSystems.GetCompanionInfo(seed, type);
-        
-        return new ScientificMilkyWayGenerator.Star
-        {
-            Position = position,
-            Type = type,
-            Mass = mass,
-            Temperature = properties.temperature,
-            Color = properties.color,
-            Luminosity = properties.luminosity,
-            Seed = seed,
-            Population = population,
-            Region = baseGenerator.DetermineRegion(position),
-            PlanetCount = planetarySystem.Planets.Count,
-            IsMultiple = isMultiple,
-            SystemName = MultipleStarSystems.GetSystemName(seed, type)
-        };
-    }
-    
-    /// <summary>
-    /// Calculate expected number of stars in a chunk based on density
-    /// </summary>
-    private int CalculateExpectedStars(ChunkCoordinate chunk)
-    {
-        var bounds = chunk.GetBounds();
-        
-        // Sample density at multiple points
-        double totalDensity = 0;
-        int samples = 0;
-        
-        for (int i = 0; i < 3; i++)
-        {
-            double r = bounds.rMin + (bounds.rMax - bounds.rMin) * (i + 0.5) / 3;
-            for (int j = 0; j < 3; j++)
-            {
-                double theta = bounds.thetaMin + (bounds.thetaMax - bounds.thetaMin) * (j + 0.5) / 3;
-                for (int k = 0; k < 3; k++)
-                {
-                    double z = bounds.zMin + (bounds.zMax - bounds.zMin) * (k + 0.5) / 3;
-                    totalDensity += GalacticAnalytics.CalculateStellarDensity(r, z);
-                    samples++;
-                }
-            }
-        }
-        
-        double avgDensity = totalDensity / samples;
-        
-        // Calculate chunk volume
-        double deltaTheta = bounds.thetaMax - bounds.thetaMin;
-        double deltaR = bounds.rMax - bounds.rMin;
-        double deltaZ = bounds.zMax - bounds.zMin;
-        double volume;
-        
-        if (chunk.R == 0)
-        {
-            // Volume of a wedge from r=0 to r=deltaR
-            volume = 0.5 * deltaTheta * deltaR * deltaR * deltaZ;
-        }
-        else
-        {
-            // Standard cylindrical wedge volume
-            double avgRadius = (bounds.rMin + bounds.rMax) / 2;
-            volume = avgRadius * deltaR * deltaTheta * deltaZ;
-        }
-        
-        int expectedStars = Math.Max(1, (int)(avgDensity * volume));
-        
-        // No cap - let density determine star count naturally
-        return expectedStars;
-    }
-    
-    /// <summary>
-    /// Generate all stars in a chunk - SUPER FAST!
+    /// Generate all stars in a chunk using the unified density-based algorithm
     /// </summary>
     public List<ScientificMilkyWayGenerator.Star> GenerateChunkStars(string chunkId)
     {
@@ -248,15 +207,53 @@ public class GalaxyChunkSystem
             bounds.rMin, bounds.rMax, bounds.thetaMin, bounds.thetaMax, bounds.zMin, bounds.zMax);
         stars.AddRange(specialObjects);
         
-        // Calculate expected stars
-        int expectedStars = CalculateExpectedStars(chunk);
+        // Calculate expected star count based on density
+        var centerPos = chunk.GetCenterPosition();
+        var volume = chunk.GetVolume();
+        var expectedCount = GalaxyGenerator.GetExpectedStarCount(centerPos, (float)volume);
         
-        // Generate all stars in chunk - just iterate through indices!
-        for (int i = 0; i < expectedStars; i++)
+        // Use the chunk's deterministic seed
+        int chunkSeed = chunkId.GetHashCode();
+        
+        // Generate star positions using unified generator
+        var minBounds = new GalaxyGenerator.Vector3(
+            (float)(bounds.rMin * Math.Cos(bounds.thetaMin) - 50),
+            (float)(bounds.rMin * Math.Sin(bounds.thetaMin) - 50),
+            (float)bounds.zMin
+        );
+        
+        var maxBounds = new GalaxyGenerator.Vector3(
+            (float)(bounds.rMax * Math.Cos(bounds.thetaMax) + 50),
+            (float)(bounds.rMax * Math.Sin(bounds.thetaMax) + 50),
+            (float)bounds.zMax
+        );
+        
+        // Generate positions using density-based rejection sampling
+        var positions = GalaxyGenerator.GenerateStarPositionsInRegion(
+            minBounds, maxBounds, (int)expectedCount, chunkSeed);
+        
+        // Filter positions to only those actually in the chunk
+        int starIndex = 0;
+        foreach (var pos in positions)
         {
-            long seed = EncodeSeed(chunk.R, chunk.Theta, chunk.Z, i);
-            var star = GetStarBySeed(seed);
-            stars.Add(star);
+            // Check if position is actually in this chunk
+            var r = pos.Length2D();
+            var theta = Math.Atan2(pos.Y, pos.X);
+            if (theta < 0) theta += 2 * Math.PI;
+            
+            if (r >= bounds.rMin && r < bounds.rMax &&
+                theta >= bounds.thetaMin && theta < bounds.thetaMax &&
+                pos.Z >= bounds.zMin && pos.Z < bounds.zMax)
+            {
+                // Convert GalaxyGenerator.Vector3 to ScientificMilkyWayGenerator.Vector3
+                var starPos = new ScientificMilkyWayGenerator.Vector3(pos.X, pos.Y, pos.Z);
+                
+                // Generate star at this position (it will use unified seed internally)
+                var star = baseGenerator.GenerateStarAtPosition(starPos);
+                
+                // Star already has the correct position-based seed from GenerateStarAtPosition
+                stars.Add(star);
+            }
         }
         
         return stars;
@@ -292,30 +289,12 @@ public class GalaxyChunkSystem
         Console.WriteLine($"Vertical range: {bounds.zMin:F0} - {bounds.zMax:F0} ly");
         
         // Calculate chunk volume
-        double deltaTheta = bounds.thetaMax - bounds.thetaMin;
-        double deltaR = bounds.rMax - bounds.rMin;
-        double deltaZ = bounds.zMax - bounds.zMin;
-        double volume;
-        
-        if (chunk.R == 0)
-        {
-            // Volume of a wedge from r=0 to r=deltaR
-            // V = (1/2) * deltaTheta * r² * height
-            volume = 0.5 * deltaTheta * deltaR * deltaR * deltaZ;
-        }
-        else
-        {
-            // Standard cylindrical wedge volume
-            double avgRadius = (bounds.rMin + bounds.rMax) / 2;
-            volume = avgRadius * deltaR * deltaTheta * deltaZ;
-        }
-        
+        var volume = chunk.GetVolume();
         Console.WriteLine($"Chunk volume: {volume:F1} ly³");
         
-        // Sample density at center
-        double centerR = (bounds.rMin + bounds.rMax) / 2;
-        double centerZ = (bounds.zMin + bounds.zMax) / 2;
-        double theoreticalDensity = GalacticAnalytics.CalculateStellarDensity(centerR, centerZ);
+        // Sample density at center using unified generator
+        var centerPos = chunk.GetCenterPosition();
+        var theoreticalDensity = GalaxyGenerator.CalculateTotalDensity(centerPos) * 0.14f * 2.0f; // Match scaling
         Console.WriteLine($"Theoretical density at center: {theoreticalDensity:E2} stars/ly³");
         
         // Generate stars
