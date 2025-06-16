@@ -25,11 +25,9 @@ if %ERRORLEVEL% EQU 0 (
     copy /Y ScientificGalaxyVisualizer2.cs ScientificMilkyWayVisual\
     copy /Y GalacticAnalytics.cs ScientificMilkyWayVisual\
     copy /Y ChunkBasedGalaxySystem.cs ScientificMilkyWayVisual\
-    copy /Y MultipleStarSystems.cs ScientificMilkyWayVisual\
-    copy /Y PlanetarySystemGenerator.cs ScientificMilkyWayVisual\
+    copy /Y UnifiedSystemGenerator.cs ScientificMilkyWayVisual\
     copy /Y GalaxyGenerator.cs ScientificMilkyWayVisual\
     copy /Y ChunkVisualizer.cs ScientificMilkyWayVisual\
-    copy /Y SkyGenerator.cs ScientificMilkyWayVisual\
     
     REM Add SkiaSharp package
     cd ScientificMilkyWayVisual

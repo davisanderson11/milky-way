@@ -38,7 +38,8 @@ The master algorithm that defines the galaxy's structure:
    - Pure formula-based density heatmaps
    - Logarithmic scaling for wide density ranges
    - Adjustable vertical scale for side views
-   - Updated color scheme (black only for density < 0.0001)
+   - Updated color scheme (black only for density < 0.0000015)
+   - Purple transition between grey and blue colors
 
 5. **ChunkVisualizer.cs**: Individual chunk visualization
    - Generate images of any chunk showing actual star colors
@@ -58,33 +59,43 @@ The master algorithm that defines the galaxy's structure:
 - Removed separate bulge/disk/halo calculations
 - Smooth transitions everywhere - no discontinuities
 
-### Realistic Stellar Densities (Calibrated to Observations)
-- Galactic center (r < 130 ly): ~288 stars/ly³
-- 100 parsecs from center: ~2.9 stars/ly³
-- Bulge transition (1000 ly): ~0.3 stars/ly³
-- Solar neighborhood: ~0.004 stars/ly³
-- Galactic halo: ~0.000000004 stars/ly³
-- Multi-phase exponential decay in bulge for realistic gradients
+### Scientifically Accurate Stellar Densities
+- Piecewise function matching 14 observational data points exactly
+- Galactic center (0 ly): 288 stars/ly³
+- 100 ly: 100 stars/ly³
+- 500 ly: 5 stars/ly³
+- 1000 ly: 1 star/ly³
+- 2500 ly: 0.2 stars/ly³
+- 5000 ly: 0.04 stars/ly³
+- Solar neighborhood (26,000 ly): 0.004 stars/ly³
+- Outer disk (40,000 ly): 0.001 stars/ly³
+- Far halo (80,000 ly): 0.00005 stars/ly³
+- Smooth exponential/power-law interpolation between all points
+
+### Enhanced Spiral Arms
+- 6 spiral arms total for better coverage:
+  - 2 major arms (strongest, 15° pitch angle)
+  - 2 medium arms (moderate, 18° pitch angle)  
+  - 2 minor arms (weakest, 22° pitch angle)
+- All arms are wider for more realistic appearance
+- Minor arms repositioned to avoid overlap with major arms
+- Logarithmic spirals create ~2 full galactic rotations
+
+### Visualization Improvements
+- Density heatmaps now include distance rulers on side/front views
+- Rulers show scale in light years with smart tick intervals
+- Axis labels for clarity ("Distance (ly)" and "Height (ly)")
+- Better color scaling for new density values
+
+### Removed Features
+- Sky view generation (option 9) - removed for performance
+- Galaxy statistics generation (option 3) - removed as redundant
+- SkyGenerator.cs file deleted
 
 ### Bit Encoding Fix
 - Expanded star index from 15 to 36 bits
 - Supports up to ~68 billion stars per chunk
 - Fixed overflow bug that corrupted chunk coordinates
-
-### Galaxy Integration
-- Added total star count estimation (menu option 8)
-- Uses density formula integration with logarithmic sampling
-- Estimates ~225 billion stars total (latest observational estimates)
-
-### Improved Spiral Arms
-- Proper logarithmic spirals with 15-20° pitch angles
-- Results in ~640° total rotation (almost 2 full winds)
-- Matches real spiral galaxy observations
-
-### Enhanced Visualization
-- Density heatmaps use better color scheme
-- Rejection sampling matches formula scale heights
-- Chunk visualizer shows stars with actual colors
 
 ### Performance Optimizations
 - Lazy loading with seed ranges for dense regions
@@ -94,13 +105,14 @@ The master algorithm that defines the galaxy's structure:
 ## Console Interface Menu
 1. Export stars for Unity (JSON)
 2. Find star by seed
-3. Generate galaxy statistics  
+3. (Removed - was galaxy statistics)
 4. Generate galaxy images (point cloud)
 5. Generate density heatmaps (pure formulas)
 6. Investigate galaxy chunk
 7. Visualize chunk (generate images)
 8. Estimate total galaxy star count
-9. Exit
+9. (Removed - was sky view)
+10. Exit
 
 ## Building the Project
 
@@ -120,6 +132,15 @@ dotnet run
 - .NET 8.0 SDK
 - Windows/Linux/macOS
 - SkiaSharp (auto-installed for visual version)
+
+## Recent Changes
+
+### Unified System Generator
+- Replaced separate PlanetarySystemGenerator and MultipleStarSystems with unified approach
+- Supports hierarchical stellar systems (sub-binaries, triple/quadruple stars)
+- Binary planets and binary moons
+- Clear tree display format without "Star-" prefix
+- Visual binary indicators using └┬ connectors
 
 ## Key Features
 

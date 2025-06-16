@@ -23,13 +23,13 @@ public class ScientificMilkyWayConsole
             Console.WriteLine();
             Console.WriteLine("1. Export stars for Unity (JSON)");
             Console.WriteLine("2. Find star by seed");
-            Console.WriteLine("3. Generate galaxy statistics");
+            // Option 3 removed (was galaxy statistics)
             Console.WriteLine("4. Generate galaxy images (point cloud)");
             Console.WriteLine("5. Generate density heatmaps (pure formulas)");
             Console.WriteLine("6. Investigate galaxy chunk");
             Console.WriteLine("7. Visualize chunk (generate images)");
             Console.WriteLine("8. Estimate total galaxy star count");
-            Console.WriteLine("9. Generate sky view from coordinates");
+            // Option 9 removed (was sky view)
             Console.WriteLine("10. Exit");
             Console.WriteLine();
             Console.Write("Select option: ");
@@ -45,7 +45,7 @@ public class ScientificMilkyWayConsole
                     FindStarBySeedChunkBased(chunkBasedSystem, generator);
                     break;
                 case "3":
-                    GenerateStatistics(generator);
+                    Console.WriteLine("This option has been removed.");
                     break;
                 case "4":
                     GenerateGalaxyImages(generator);
@@ -63,7 +63,7 @@ public class ScientificMilkyWayConsole
                     chunkBasedSystem.EstimateTotalStarCount();
                     break;
                 case "9":
-                    GenerateSkyView(chunkBasedSystem, generator);
+                    Console.WriteLine("This option has been removed.");
                     break;
                 case "10":
                     return;
@@ -122,42 +122,6 @@ public class ScientificMilkyWayConsole
         Console.WriteLine($"✓ Exported {stars.Count:N0} stars to {filename}");
     }
     
-    static void GenerateStatistics(ScientificMilkyWayGenerator generator)
-    {
-        Console.WriteLine("\n=== Galaxy Statistics ===");
-        Console.WriteLine("Analyzing 1 million star sample...");
-        
-        var stars = generator.GenerateStars(1000000);
-        
-        var typeGroups = stars.GroupBy(s => s.Type).OrderByDescending(g => g.Count());
-        var popGroups = stars.GroupBy(s => s.Population).OrderByDescending(g => g.Count());
-        var regionGroups = stars.GroupBy(s => s.Region).OrderByDescending(g => g.Count());
-        
-        Console.WriteLine("\nStar Types:");
-        foreach (var group in typeGroups)
-        {
-            Console.WriteLine($"  {group.Key,-15} {group.Count(),8} ({group.Count() / 10000.0:F1}%)");
-        }
-        
-        Console.WriteLine("\nStellar Populations:");
-        foreach (var group in popGroups)
-        {
-            Console.WriteLine($"  {group.Key,-15} {group.Count(),8} ({group.Count() / 10000.0:F1}%)");
-        }
-        
-        Console.WriteLine("\nGalactic Regions:");
-        foreach (var group in regionGroups)
-        {
-            Console.WriteLine($"  {group.Key,-15} {group.Count(),8} ({group.Count() / 10000.0:F1}%)");
-        }
-        
-        var avgDistance = stars.Average(s => Math.Sqrt(s.Position.X * s.Position.X + s.Position.Y * s.Position.Y + s.Position.Z * s.Position.Z));
-        var maxDistance = stars.Max(s => Math.Sqrt(s.Position.X * s.Position.X + s.Position.Y * s.Position.Y + s.Position.Z * s.Position.Z));
-        
-        Console.WriteLine($"\nDistance Statistics:");
-        Console.WriteLine($"  Average distance from center: {avgDistance:F0} ly");
-        Console.WriteLine($"  Maximum distance from center: {maxDistance:F0} ly");
-    }
     
     static void GenerateGalaxyImages(ScientificMilkyWayGenerator generator)
     {
@@ -222,7 +186,7 @@ public class ScientificMilkyWayConsole
         Console.WriteLine("  Planets: _1, _2 or -1, -2");
         Console.WriteLine("  Moons: _1_a, _2_b or -1-a, -2-b");
         
-        var planetGen = new PlanetarySystemGenerator();
+        var unifiedGen = new UnifiedSystemGenerator();
         
         while (true)
         {
@@ -367,105 +331,119 @@ public class ScientificMilkyWayConsole
                 // Get the star
                 star = chunkSystem.GetStarBySeed(starSeed);
                 
+                // Generate the unified system once
+                var systemRoot = unifiedGen.GenerateSystem(star.Seed, star.Type, star.Mass, 
+                    star.Temperature, star.Luminosity, star.Seed.ToString());
+                
                 // Handle companion star query
                 if (isCompanion)
                 {
-                    if (!star.IsMultiple)
+                    // Find the companion star
+                    UnifiedSystemGenerator.Star? companionStar = null;
+                    
+                    // Check direct children
+                    companionStar = systemRoot.Children
+                        .OfType<UnifiedSystemGenerator.Star>()
+                        .FirstOrDefault(s => s.Name.EndsWith($" {companionLetter}"));
+                    
+                    // Check binary companion
+                    if (companionStar == null && systemRoot.BinaryCompanion is UnifiedSystemGenerator.Star bs && 
+                        bs.Name.EndsWith($" {companionLetter}"))
                     {
-                        Console.WriteLine($"\nError: Star {starSeed} is not part of a multiple star system.");
-                        Console.WriteLine($"No companion '{companionLetter}' exists for this star.");
+                        companionStar = bs;
+                    }
+                    
+                    if (companionStar == null)
+                    {
+                        Console.WriteLine($"\nError: Companion star {companionLetter} not found in system.");
                         continue;
                     }
                     
                     Console.WriteLine($"\nCompanion Star Details:");
-                    Console.WriteLine($"  System: {starSeed}-{companionLetter}");
-                    Console.WriteLine($"  Primary star seed: {starSeed}");
-                    Console.WriteLine($"  Companion designation: {companionLetter}");
-                    Console.WriteLine($"  Primary star type: {star.Type}");
-                    Console.WriteLine($"  Primary star mass: {star.Mass:F3} solar masses");
-                    
-                    var (_, companionCount, companionDesignations) = MultipleStarSystems.GetCompanionInfo(star.Seed, star.Type);
-                    if (companionDesignations.Contains(companionLetter))
-                    {
-                        var (mass, separationAU, _) = MultipleStarSystems.GetCompanionProperties(star.Seed, star.Mass, companionLetter);
-                        var companionType = MultipleStarSystems.GetCompanionStellarType(mass, star.Seed, companionLetter);
-                        Console.WriteLine($"  Companion type: {companionType}");
-                        Console.WriteLine($"  Companion mass: {mass:F2} solar masses");
-                        Console.WriteLine($"  Separation: {separationAU:F1} AU");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"  Error: Companion '{companionLetter}' not found in system");
-                    }
+                    Console.WriteLine($"  Name: {companionStar.Name}");
+                    Console.WriteLine($"  Type: {companionStar.StellarType}");
+                    Console.WriteLine($"  Mass: {companionStar.Mass:F3} solar masses");
+                    Console.WriteLine($"  Temperature: {companionStar.Temperature:F0} K");
+                    Console.WriteLine($"  Separation: {companionStar.OrbitalDistance:F2} AU");
                     
                     if (isPlanet)
                     {
-                        // Generate the multiple star system to get companion's planetary system
-                        var multipleSystem = MultipleStarSystems.GenerateMultipleStarSystem(star);
-                        var companion = multipleSystem.Companions.FirstOrDefault(c => c.Designation == companionLetter);
+                        var planet = companionStar.Children
+                            .OfType<UnifiedSystemGenerator.Planet>()
+                            .FirstOrDefault(p => p.Name.EndsWith($" {planetIndex}"));
                         
-                        if (companion?.PlanetarySystem != null)
+                        if (planet != null)
                         {
-                            var planet = companion.PlanetarySystem.Planets.FirstOrDefault(p => p.Index == planetIndex);
-                            if (planet != null)
+                            Console.WriteLine($"\n  Planet {planetIndex} of companion star {companionLetter}:");
+                            Console.WriteLine($"    Type: {planet.PlanetType}");
+                            Console.WriteLine($"    Mass: {planet.Mass:F2} Earth masses");
+                            Console.WriteLine($"    Orbital Distance: {planet.OrbitalDistance:F2} AU");
+                            Console.WriteLine($"    Moons: {planet.Children.Count}");
+                            
+                            if (isMoon)
                             {
-                                Console.WriteLine($"\n  Planet {planetIndex} of companion star {companionLetter}:");
-                                Console.WriteLine($"    Type: {planet.Type}");
-                                Console.WriteLine($"    Mass: {planet.Mass:F2} Earth masses");
-                                Console.WriteLine($"    Orbital Distance: {planet.OrbitalDistance:F2} AU");
-                                Console.WriteLine($"    Moons: {planet.Moons.Count}");
+                                var moon = planet.Children
+                                    .OfType<UnifiedSystemGenerator.Moon>()
+                                    .FirstOrDefault(m => m.Name.EndsWith($" {moonLetter}"));
                                 
-                                if (isMoon)
+                                if (moon != null)
                                 {
-                                    var moon = planet.Moons.FirstOrDefault(m => m.Letter == moonLetter);
-                                    if (moon != null)
-                                    {
-                                        Console.WriteLine($"\n  Moon {moonLetter} of planet {planetIndex}:");
-                                        Console.WriteLine($"    Type: {moon.Type}");
-                                        Console.WriteLine($"    Mass: {moon.Mass:F4} Earth masses");
-                                    }
-                                    else
-                                    {
-                                        Console.WriteLine($"  Moon {moonLetter} not found");
-                                    }
+                                    Console.WriteLine($"\n  Moon {moonLetter} of planet {planetIndex}:");
+                                    Console.WriteLine($"    Type: {moon.Composition}");
+                                    Console.WriteLine($"    Mass: {moon.Mass:F4} Earth masses");
                                 }
-                            }
-                            else
-                            {
-                                Console.WriteLine($"  Planet {planetIndex} not found for companion {companionLetter}");
+                                else
+                                {
+                                    Console.WriteLine($"  Moon {moonLetter} not found");
+                                }
                             }
                         }
                         else
                         {
-                            Console.WriteLine($"  No planetary system found for companion {companionLetter}");
+                            Console.WriteLine($"  Planet {planetIndex} not found for companion {companionLetter}");
                         }
                     }
                 }
                 // Handle planet query
                 else if (isPlanet)
                 {
-                    var system = planetGen.GeneratePlanetarySystem(star.Seed, star.Type, star.Mass, $"Star-{star.Seed}");
-                    var planet = planetGen.GetPlanetDetails(system, planetIndex);
+                    // Find planet in the system
+                    UnifiedSystemGenerator.Planet? planet = null;
+                    
+                    // Search in all stars' children
+                    var allStars = new List<UnifiedSystemGenerator.Star> { systemRoot };
+                    allStars.AddRange(systemRoot.Children.OfType<UnifiedSystemGenerator.Star>());
+                    if (systemRoot.BinaryCompanion is UnifiedSystemGenerator.Star bs2)
+                        allStars.Add(bs2);
+                    
+                    foreach (var s in allStars)
+                    {
+                        planet = s.Children
+                            .OfType<UnifiedSystemGenerator.Planet>()
+                            .FirstOrDefault(p => p.Name.EndsWith($" {planetIndex}"));
+                        if (planet != null) break;
+                    }
                     
                     if (planet != null)
                     {
                         Console.WriteLine($"\nPlanet Details:");
-                        Console.WriteLine($"  Star: {system.StarName} (Seed: {starSeed})");
-                        Console.WriteLine($"  Planet Index: {planet.Index}");
-                        Console.WriteLine($"  Type: {planet.Type}");
+                        Console.WriteLine($"  Name: {planet.Name}");
+                        Console.WriteLine($"  Type: {planet.PlanetType}");
                         Console.WriteLine($"  Mass: {planet.Mass:F2} Earth masses");
                         Console.WriteLine($"  Orbital Distance: {planet.OrbitalDistance:F2} AU");
-                        Console.WriteLine($"  Moons: {planet.Moons.Count}");
+                        Console.WriteLine($"  Moons: {planet.Children.Count}");
                         
                         if (isMoon)
                         {
-                            var moonId = $"{planetIndex}-{moonLetter}";
-                            var moon = planetGen.GetMoonDetails(system, moonId);
+                            var moon = planet.Children
+                                .OfType<UnifiedSystemGenerator.Moon>()
+                                .FirstOrDefault(m => m.Name.EndsWith($" {moonLetter}"));
+                                
                             if (moon != null)
                             {
                                 Console.WriteLine($"\nMoon Details:");
-                                Console.WriteLine($"  Moon: {moon.Letter}");
-                                Console.WriteLine($"  Type: {moon.Type}");
+                                Console.WriteLine($"  Name: {moon.Name}");
+                                Console.WriteLine($"  Type: {moon.Composition}");
                                 Console.WriteLine($"  Mass: {moon.Mass:F4} Earth masses");
                             }
                             else
@@ -495,33 +473,12 @@ public class ScientificMilkyWayConsole
                     Console.WriteLine($"  Region: {star.Region}");
                     Console.WriteLine($"  Planets: {star.PlanetCount}");
                     
+                    // Display the unified system tree
+                    Console.WriteLine(UnifiedSystemGenerator.GetSystemTreeDisplay(systemRoot));
+                    
                     if (star.IsMultiple)
                     {
-                        Console.WriteLine($"  Multiple System: Yes");
-                        
-                        // Generate the complete multiple star system with planetary systems
-                        var multipleSystem = MultipleStarSystems.GenerateMultipleStarSystem(star);
-                        Console.WriteLine($"  Companion stars: {multipleSystem.Companions.Count}");
-                        
-                        foreach (var companion in multipleSystem.Companions)
-                        {
-                            Console.WriteLine($"    {starSeed}-{companion.Designation}: {companion.Type}, {companion.Mass:F2} solar masses, {companion.SeparationAU:F1} AU separation");
-                            if (companion.PlanetarySystem != null && companion.PlanetarySystem.Planets.Count > 0)
-                            {
-                                Console.WriteLine($"      Planets: {companion.PlanetarySystem.Planets.Count}");
-                            }
-                        }
-                    }
-                    
-                    // Show planetary system if it has planets
-                    if (star.PlanetCount > 0)
-                    {
-                        var system = planetGen.GeneratePlanetarySystem(star.Seed, star.Type, star.Mass, $"Star-{star.Seed}");
-                        Console.WriteLine("\n  Planetary System:");
-                        foreach (var planet in system.Planets)
-                        {
-                            Console.WriteLine($"    Planet {planet.Index}: {planet.Type} ({planet.Mass:F1} Earth masses, {planet.OrbitalDistance:F2} AU, {planet.Moons.Count} moons)");
-                        }
+                        Console.WriteLine($"  Multiple System: Yes (see system tree above)");
                     }
                 }
             }
@@ -602,54 +559,4 @@ public class ScientificMilkyWayConsole
         }
     }
     
-    static void GenerateSkyView(ChunkBasedGalaxySystem chunkSystem, ScientificMilkyWayGenerator generator)
-    {
-        Console.WriteLine("\n=== Generate Sky View ===");
-        Console.WriteLine("Generate a realistic view of the sky from any position in the galaxy");
-        Console.WriteLine("View is always facing toward the galactic center");
-        Console.WriteLine();
-        
-        // Get observer position
-        Console.Write("Enter observer X coordinate (light-years): ");
-        if (!double.TryParse(Console.ReadLine(), out double obsX))
-        {
-            obsX = 26000; // Default to solar position
-            Console.WriteLine($"Using default X: {obsX}");
-        }
-        
-        Console.Write("Enter observer Y coordinate (light-years): ");
-        if (!double.TryParse(Console.ReadLine(), out double obsY))
-        {
-            obsY = 0;
-            Console.WriteLine($"Using default Y: {obsY}");
-        }
-        
-        Console.Write("Enter observer Z coordinate (light-years): ");
-        if (!double.TryParse(Console.ReadLine(), out double obsZ))
-        {
-            obsZ = 0;
-            Console.WriteLine($"Using default Z: {obsZ}");
-        }
-        
-        Console.Write("\nImage resolution (512-4096, default 2048): ");
-        int resolution = 2048;
-        var resInput = Console.ReadLine();
-        if (!string.IsNullOrEmpty(resInput) && int.TryParse(resInput, out int res))
-        {
-            resolution = Math.Max(512, Math.Min(4096, res));
-        }
-        
-        Console.WriteLine($"\nGenerating {resolution}x{resolution} sky view from ({obsX:F0}, {obsY:F0}, {obsZ:F0})...");
-        
-        try
-        {
-            var skyGen = new SkyGenerator(chunkSystem, generator);
-            skyGen.GenerateSkyView(obsX, obsY, obsZ, resolution);
-            Console.WriteLine("\n✓ Sky view image saved successfully!");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error generating sky view: {ex.Message}");
-        }
-    }
 }

@@ -726,6 +726,12 @@ public class ScientificGalaxyVisualizer2
             paint.TextSize = 20;
             string label = viewType == "top" ? "Top View" : viewType == "side" ? "Side View" : "Spiral Arms";
             canvas.DrawText(label, 10, 30, paint);
+            
+            // Add distance rulers for side and front views
+            if (viewType == "side" || viewType == "front")
+            {
+                DrawDistanceRulers(canvas, width, height, scale, scaleZ, viewType, verticalScale);
+            }
         }
     }
     
@@ -907,24 +913,31 @@ public class ScientificGalaxyVisualizer2
         // Clamp value to [0, 1]
         value = Math.Max(0, Math.Min(1, value));
         
-        // Special handling for very low density - anything below 0.0001 normalized (roughly 10^-4)
+        // Special handling for very low density - now 100x lower threshold
         // Since we use log scale with (Log10(density + 0.001) + 3) / 3, 
-        // density of 0.0001 maps to (Log10(0.0011) + 3) / 3 = (-2.96 + 3) / 3 = 0.013
-        if (value < 0.02f)  // This catches densities below ~0.0001
+        // density of 0.0000015 maps to (Log10(0.0010015) + 3) / 3 = (-3.0 + 3) / 3 = 0.0
+        // We'll use a threshold of 0.0002 which corresponds to density ~0.0000015
+        if (value < 0.0002f)  // This catches densities below ~0.0000015
         {
             return SKColors.Black;
         }
         
         // Rescale remaining range to start from gray
-        value = (value - 0.02f) / 0.98f;
+        value = (value - 0.0002f) / 0.9998f;
         
-        // Create a heat color map: gray -> blue -> cyan -> green -> yellow -> red -> white
-        if (value < 0.1f)
+        // Create a heat color map: gray -> purple -> blue -> cyan -> green -> yellow -> red -> white
+        if (value < 0.05f)
         {
-            // Gray to dark blue
-            var t = value / 0.1f;
+            // Gray to dark purple
+            var t = value / 0.05f;
             var gray = 64;  // Start from dark gray
-            return new SKColor((byte)(gray * (1 - t)), (byte)(gray * (1 - t)), (byte)(gray + t * (128 - gray)));
+            return new SKColor((byte)(gray * (1 - t) + 64 * t), (byte)(gray * (1 - t)), (byte)(gray * (1 - t) + 128 * t));
+        }
+        else if (value < 0.1f)
+        {
+            // Dark purple to dark blue
+            var t = (value - 0.05f) / 0.05f;
+            return new SKColor((byte)(64 * (1 - t)), 0, (byte)(128));
         }
         else if (value < 0.25f)
         {
@@ -1031,6 +1044,86 @@ public class ScientificGalaxyVisualizer2
             canvas.DrawText("10⁻¹", legendX + legendWidth * 0.33f - 15, legendY + 35, paint);
             canvas.DrawText("10¹", legendX + legendWidth * 0.67f - 15, legendY + 35, paint);
             canvas.DrawText("10³", legendX + legendWidth - 15, legendY + 35, paint);
+        }
+    }
+    
+    /// <summary>
+    /// Draw distance rulers on the heatmap views
+    /// </summary>
+    private void DrawDistanceRulers(SKCanvas canvas, int width, int height, float scaleX, float scaleZ, string viewType, float verticalScale)
+    {
+        using (var paint = new SKPaint())
+        {
+            paint.Color = SKColors.White;
+            paint.StrokeWidth = 1;
+            paint.IsAntialias = true;
+            
+            // Draw horizontal ruler (X-axis)
+            float rulerY = height - 30;
+            canvas.DrawLine(0, rulerY, width, rulerY, paint);
+            
+            // Calculate tick interval - aim for ticks every ~100 pixels
+            float maxDistanceX = width * scaleX / 2;
+            float tickIntervalX = 10000; // Start with 10,000 ly
+            if (maxDistanceX > 50000) tickIntervalX = 20000;
+            if (maxDistanceX < 20000) tickIntervalX = 5000;
+            if (maxDistanceX < 10000) tickIntervalX = 2000;
+            if (maxDistanceX < 5000) tickIntervalX = 1000;
+            
+            // Draw X-axis ticks and labels
+            paint.TextSize = 12;
+            for (float distance = -maxDistanceX; distance <= maxDistanceX; distance += tickIntervalX)
+            {
+                float x = width / 2f + distance / scaleX;
+                if (x >= 0 && x <= width)
+                {
+                    canvas.DrawLine(x, rulerY - 5, x, rulerY + 5, paint);
+                    
+                    string label = $"{distance / 1000:0}k";
+                    if (distance == 0) label = "0";
+                    var textBounds = new SKRect();
+                    paint.MeasureText(label, ref textBounds);
+                    canvas.DrawText(label, x - textBounds.Width / 2, rulerY + 20, paint);
+                }
+            }
+            
+            // Draw vertical ruler (Z-axis for side view)
+            float rulerX = 30;
+            canvas.DrawLine(rulerX, 0, rulerX, height, paint);
+            
+            // Calculate tick interval for Z-axis
+            float maxDistanceZ = height * scaleZ / 2;
+            float tickIntervalZ = 1000; // Start with 1,000 ly for Z
+            if (maxDistanceZ > 5000) tickIntervalZ = 2000;
+            if (maxDistanceZ < 2000) tickIntervalZ = 500;
+            if (maxDistanceZ < 1000) tickIntervalZ = 200;
+            
+            // Draw Z-axis ticks and labels
+            for (float distance = -maxDistanceZ; distance <= maxDistanceZ; distance += tickIntervalZ)
+            {
+                float y = height / 2f - distance / scaleZ;
+                if (y >= 0 && y <= height)
+                {
+                    canvas.DrawLine(rulerX - 5, y, rulerX + 5, y, paint);
+                    
+                    string label = $"{distance:0}";
+                    if (Math.Abs(distance) >= 1000) label = $"{distance / 1000:0}k";
+                    canvas.DrawText(label, rulerX + 10, y + 5, paint);
+                }
+            }
+            
+            // Add axis labels
+            paint.TextSize = 14;
+            paint.Color = SKColors.LightGray;
+            
+            // X-axis label
+            canvas.DrawText("Distance (ly)", width / 2f - 40, height - 5, paint);
+            
+            // Z-axis label
+            canvas.Save();
+            canvas.RotateDegrees(-90, 15, height / 2f);
+            canvas.DrawText("Height (ly)", 15 - 35, height / 2f + 5, paint);
+            canvas.Restore();
         }
     }
 }
