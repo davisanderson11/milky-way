@@ -380,105 +380,107 @@ public static class GalaxyGenerator
     }
     
     /// <summary>
+    /// Calculate target stellar density at a given radius based on scientific observations
+    /// </summary>
+    private static float GetTargetDensityAtRadius(float r)
+    {
+        // Key density checkpoints from modern astrophysics
+        // Using piecewise smooth interpolation between known values
+        
+        if (r < 100)
+        {
+            // Nuclear star cluster - constant high density
+            return 288f;
+        }
+        else if (r < 500)
+        {
+            // Steep dropoff from nuclear cluster
+            // 288 at r=100 to ~3.5 at r=500
+            var t = (r - 100f) / 400f;
+            // Use exponential interpolation for smooth transition
+            return 288f * (float)Math.Exp(-t * 4.5f);
+        }
+        else if (r < 1000)
+        {
+            // Continue dropoff to bulge
+            // ~3.5 at r=500 to 1.2 at r=1000
+            var t = (r - 500f) / 500f;
+            var start = 3.5f;
+            var end = 1.2f;
+            // Smooth cubic interpolation
+            var smoothT = t * t * (3f - 2f * t);
+            return start * (1 - smoothT) + end * smoothT;
+        }
+        else if (r < 2500)
+        {
+            // Inner bulge decay
+            // 1.2 at r=1000 to 0.1 at r=2500
+            var t = (r - 1000f) / 1500f;
+            return 1.2f * (float)Math.Exp(-t * 2.5f);
+        }
+        else if (r < 5000)
+        {
+            // Outer bulge to disk transition
+            // 0.1 at r=2500 to 0.008 at r=5000
+            var t = (r - 2500f) / 2500f;
+            return 0.1f * (float)Math.Exp(-t * 2.5f);
+        }
+        else if (r < 8000)
+        {
+            // Transition to disk
+            // 0.008 at r=5000 to 0.01 at r=8000
+            var t = (r - 5000f) / 3000f;
+            var start = 0.008f;
+            var end = 0.01f;
+            return start * (1 - t) + end * t;
+        }
+        else if (r < 50000)
+        {
+            // Main disk with exponential decay
+            // 0.01 at r=8000, 0.004 at r=26000, 1e-6 at r=50000
+            // Use modified exponential to hit these targets
+            var diskRef = 8000f;
+            var solarRadius = 26000f;
+            
+            if (r < solarRadius)
+            {
+                // Inner to solar neighborhood
+                var t = (r - diskRef) / (solarRadius - diskRef);
+                // Exponential interpolation
+                return 0.01f * (float)Math.Pow(0.004f / 0.01f, t);
+            }
+            else
+            {
+                // Solar neighborhood to outer disk
+                // Faster decay after solar radius
+                var t = (r - solarRadius) / (50000f - solarRadius);
+                // Steep exponential to reach 1e-6
+                return 0.004f * (float)Math.Exp(-t * 8.5f);
+            }
+        }
+        else
+        {
+            // Far outer disk and halo - extremely low density
+            // Exponential decay continuing from 50000 ly
+            var t = (r - 50000f) / 20000f;
+            return 1e-6f * (float)Math.Exp(-t * 2f);
+        }
+    }
+    
+    /// <summary>
     /// Convert normalized density (0-1) to actual stellar density (stars/ly³)
     /// </summary>
     private static float ConvertToStellarDensity(float normalizedDensity, Vector3 position)
     {
         var r = position.Length2D();
         
-        // Different regions have different density mappings
-        // The normalized density already includes the exponential falloff,
-        // so we just need to scale it to the right stellar density
+        // Get the target density for this radius
+        var targetDensity = GetTargetDensityAtRadius(r);
         
-        if (r < 130)
-        {
-            // Galactic center - 40 parsecs (130 ly) radius
-            // Peak density ~288 stars/ly³
-            return normalizedDensity * 288f;
-        }
-        else if (r < 6000)
-        {
-            // Bulge region - multi-phase exponential decay
-            // At r=130 ly: ~288 stars/ly³
-            // At r=326 ly (100 pc): ~2.9 stars/ly³
-            // At r=1000 ly: ~1.5 stars/ly³ (increased from 0.1-0.5)
-            // At r=6000 ly: ~0.01 stars/ly³ (transition to disk)
-            
-            float scaleFactor;
-            
-            if (r < 326)
-            {
-                // Inner bulge: steep decay from 288 to 2.9
-                scaleFactor = 288f * (float)Math.Exp(-(r - 130f) / 85f);
-            }
-            else if (r < 1000)
-            {
-                // Middle bulge: smooth decay from 2.9 to 1.5
-                var t = (r - 326f) / (1000f - 326f);
-                // Use smooth interpolation instead of sharp exponential
-                scaleFactor = 2.9f * (1 - t) + 1.5f * t;
-            }
-            else if (r < 2500)
-            {
-                // Transition region: smooth decay from 1.5 to 0.2
-                var t = (r - 1000f) / (2500f - 1000f);
-                // Smooth exponential transition
-                scaleFactor = 1.5f * (float)Math.Exp(-t * 2.0f);
-            }
-            else
-            {
-                // Outer bulge: smooth transition to disk
-                // At r=2500: ~0.2 stars/ly³
-                // At r=6000: ~0.01 stars/ly³ (slightly higher than disk average)
-                var t = (r - 2500f) / (6000f - 2500f);
-                scaleFactor = 0.2f * (float)Math.Exp(-t * 3.0f);
-            }
-            
-            return normalizedDensity * scaleFactor;
-        }
-        else if (r < 50000)
-        {
-            // Disk region
-            // Average disk density: 0.006 stars/ly³
-            // Solar neighborhood (26000 ly): 0.004 stars/ly³
-            // The normalized density already handles the exponential decay
-            
-            // Base disk scaling - adjusted for new normalized density values
-            float scaleFactor = 0.01f; // Base scale factor for disk
-            
-            // Smooth transition from bulge edge
-            if (r < 8000)
-            {
-                // Transition from bulge to disk
-                var t = (r - 6000f) / 2000f;
-                var bulgeEdge = 0.01f;
-                scaleFactor = bulgeEdge * (1 - t) + 0.01f * t;
-            }
-            
-            // Adjust for proper solar neighborhood density
-            // At r=26000, normalized ≈ 0.095, want 0.004 stars/ly³
-            // So scale = 0.004 / 0.095 ≈ 0.042, but we need a bit more
-            if (r > 20000 && r < 35000)
-            {
-                // Gradually increase scale factor towards solar radius
-                var t = Math.Min((r - 20000f) / 10000f, 1.0f);
-                scaleFactor = 0.01f * (1 - t) + 0.06f * t; // Increased from 0.042 to 0.06
-            }
-            else if (r >= 35000)
-            {
-                // Outer disk - needs much higher scale factor
-                // Current is way too low, increase by ~100x
-                scaleFactor = 0.06f * 100f; // 6.0f for outer regions
-            }
-            
-            return normalizedDensity * scaleFactor;
-        }
-        else
-        {
-            // Far outer regions and halo
-            // Very low density - 10^-6 of solar neighborhood
-            return normalizedDensity * 0.000004f;
-        }
+        // The normalized density represents the relative density variation
+        // due to vertical structure, spiral arms, etc.
+        // We scale it to match our target density profile
+        return normalizedDensity * targetDensity;
     }
     
     /// <summary>
