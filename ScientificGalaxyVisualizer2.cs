@@ -455,6 +455,7 @@ public class ScientificGalaxyVisualizer2
         GenerateDensityHeatmapTopView(width, height);
         GenerateDensityHeatmapSideView(width, height, verticalScale);
         GenerateDensityHeatmapArmView(width, height);
+        GenerateDensityHeatmapRogueView(width, height);
         GenerateDensityHeatmapComposite(width * 2, height * 2, verticalScale);
     }
     
@@ -609,6 +610,55 @@ public class ScientificGalaxyVisualizer2
         }
     }
     
+    private void GenerateDensityHeatmapRogueView(int width, int height)
+    {
+        Console.WriteLine("Generating rogue planet density heatmap...");
+        
+        using (var surface = SKSurface.Create(new SKImageInfo(width, height)))
+        {
+            var canvas = surface.Canvas;
+            canvas.Clear(SKColors.Black);
+            
+            // Show rogue planet density
+            var scale = 120000.0f / Math.Min(width, height);
+            
+            using (var paint = new SKPaint())
+            {
+                for (int y = 0; y < height; y += 2)
+                {
+                    for (int x = 0; x < width; x += 2)
+                    {
+                        var galX = (x - width / 2f) * scale;
+                        var galY = (height / 2f - y) * scale;
+                        
+                        var pos = new GalaxyGenerator.Vector3(galX, galY, 0);
+                        
+                        // Get rogue planet density
+                        var rogueDensity = GalaxyGenerator.CalculateRoguePlanetDensity(pos);
+                        
+                        // Apply logarithmic scaling similar to stars
+                        // Since rogues are ~1/10000 of stars, add offset to make visible
+                        var logDensity = (float)(Math.Log10(rogueDensity + 0.0000001) + 7) / 7f;
+                        logDensity = Math.Max(0, Math.Min(1, logDensity));
+                        
+                        // Use purple color scheme for rogues
+                        var color = GetRoguePlanetColor(logDensity);
+                        paint.Color = color;
+                        canvas.DrawRect(x, y, 2, 2, paint);
+                    }
+                    
+                    if (y % 100 == 0)
+                    {
+                        Console.WriteLine($"  Progress: {(float)y/height*100:F1}%");
+                    }
+                }
+            }
+            
+            DrawHeatmapInfo(canvas, "Rogue Planet Density Map [Log Scale]", width, height);
+            SaveImage(surface, "MilkyWay_DensityHeatmap_Rogues.png");
+        }
+    }
+    
     private void GenerateDensityHeatmapComposite(int width, int height, float verticalScale = 1.0f)
     {
         Console.WriteLine($"Generating composite density heatmap (vertical scale: {verticalScale}x)...");
@@ -641,11 +691,11 @@ public class ScientificGalaxyVisualizer2
             DrawDensityHeatmapQuadrant(canvas, subWidth, subHeight, "arms");
             canvas.Restore();
             
-            // Bottom-right: Cross-section profiles
+            // Bottom-right: Rogue planet density
             canvas.Save();
             canvas.ClipRect(new SKRect(subWidth, subHeight, width, height));
             canvas.Translate(subWidth, subHeight);
-            DrawCrossSectionProfiles(canvas, subWidth, subHeight);
+            DrawDensityHeatmapQuadrant(canvas, subWidth, subHeight, "rogue");
             canvas.Restore();
             
             // Title
@@ -656,7 +706,7 @@ public class ScientificGalaxyVisualizer2
                 paint.IsAntialias = true;
                 paint.Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold);
                 
-                string title = "Milky Way Density Maps - Mathematical Model";
+                string title = "Milky Way Density Maps - Stars & Rogue Planets";
                 var bounds = new SKRect();
                 paint.MeasureText(title, ref bounds);
                 canvas.DrawText(title, (width - bounds.Width) / 2, 60, paint);
@@ -704,7 +754,7 @@ public class ScientificGalaxyVisualizer2
                         logDensity = Math.Max(0, Math.Min(1, logDensity));
                         color = GetHeatmapColor(logDensity);
                     }
-                    else // arms
+                    else if (viewType == "arms")
                     {
                         var galX = (x - width / 2f) * scale;
                         var galY = (height / 2f - y) * scale;
@@ -714,6 +764,27 @@ public class ScientificGalaxyVisualizer2
                         var enhancement = (spiralDensity - 1.0f) / 2.0f;
                         enhancement = Math.Max(0, Math.Min(1, enhancement));
                         color = GetArmEnhancementColor(enhancement);
+                    }
+                    else if (viewType == "rogue")
+                    {
+                        var galX = (x - width / 2f) * scale;
+                        var galY = (height / 2f - y) * scale;
+                        var pos = new GalaxyGenerator.Vector3(galX, galY, 0);
+                        
+                        // Get rogue planet density
+                        var rogueDensity = GalaxyGenerator.CalculateRoguePlanetDensity(pos);
+                        
+                        // Apply logarithmic scaling similar to stars
+                        // Since rogues are ~1/10000 of stars, add offset to make visible
+                        var logDensity = (float)(Math.Log10(rogueDensity + 0.0000001) + 7) / 7f;
+                        logDensity = Math.Max(0, Math.Min(1, logDensity));
+                        
+                        // Use purple color scheme for rogues
+                        color = GetRoguePlanetColor(logDensity);
+                    }
+                    else
+                    {
+                        color = SKColors.Black;
                     }
                     
                     paint.Color = color;
@@ -1006,6 +1077,32 @@ public class ScientificGalaxyVisualizer2
             // Cyan to white
             var t = (value - 0.75f) / 0.25f;
             return new SKColor((byte)(t * 255), 255, 255);
+        }
+    }
+    
+    private SKColor GetRoguePlanetColor(float value)
+    {
+        // Clamp value to [0, 1]
+        value = Math.Max(0, Math.Min(1, value));
+        
+        // Purple/magenta color scheme for rogue planets
+        if (value < 0.33f)
+        {
+            // Black to deep purple
+            var t = value / 0.33f;
+            return new SKColor((byte)(50 * t), 0, (byte)(100 * t));
+        }
+        else if (value < 0.66f)
+        {
+            // Deep purple to magenta
+            var t = (value - 0.33f) / 0.33f;
+            return new SKColor((byte)(50 + 155 * t), (byte)(50 * t), (byte)(100 + 55 * t));
+        }
+        else
+        {
+            // Magenta to bright pink
+            var t = (value - 0.66f) / 0.34f;
+            return new SKColor((byte)(205 + 50 * t), (byte)(50 + 100 * t), (byte)(155 + 100 * t));
         }
     }
     

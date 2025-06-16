@@ -51,6 +51,13 @@ public class ScientificMilkyWayGenerator
         M2I, // Red supergiant
         B0I, // Blue supergiant
         
+        // Brown dwarfs (substellar objects)
+        L0, // Early L dwarf (~2200-1400K, 75-80 Jupiter masses)
+        L5, // Mid L dwarf (~1700-1400K, 65-75 Jupiter masses)
+        T0, // Early T dwarf (~1400-1200K, 50-65 Jupiter masses)
+        T5, // Mid T dwarf (~1200-900K, 30-50 Jupiter masses)
+        Y0, // Y dwarf (~600-300K, 13-30 Jupiter masses)
+        
         // Compact objects and stellar remnants
         DA, // White dwarf (DA = hydrogen atmosphere)
         NS, // Neutron star/Pulsar
@@ -145,30 +152,22 @@ public class ScientificMilkyWayGenerator
         
         // Use UnifiedSystemGenerator for planets and companions
         var unifiedGen = new UnifiedSystemGenerator();
-        var system = unifiedGen.GenerateSystem(seed, type, mass, properties.temperature, properties.luminosity, seed.ToString());
+        var system = unifiedGen.GenerateSystem(seed, type, mass, properties.temperature, properties.luminosity);
         
-        // Count total planets
-        int totalPlanets = system.Children.Count(c => c is UnifiedSystemGenerator.Planet);
-        foreach (var child in system.Children)
+        // Count total planets from all stars in the system
+        int totalPlanets = 0;
+        foreach (var star in system.AllStars)
         {
-            if (child is UnifiedSystemGenerator.Star companionStar)
-            {
-                totalPlanets += companionStar.Children.Count(c => c is UnifiedSystemGenerator.Planet);
-            }
-        }
-        if (system.BinaryCompanion is UnifiedSystemGenerator.Star binaryStar)
-        {
-            totalPlanets += binaryStar.Children.Count(c => c is UnifiedSystemGenerator.Planet);
+            totalPlanets += star.Children.Count(c => c is UnifiedSystemGenerator.Planet);
         }
         
         // Check for multiple system
-        bool isMultiple = system.Children.Any(c => c is UnifiedSystemGenerator.Star) || system.BinaryCompanion != null;
+        bool isMultiple = system.AllStars.Count > 1;
         string systemName = "Single";
         if (isMultiple)
         {
-            int companionCount = system.Children.Count(c => c is UnifiedSystemGenerator.Star);
-            if (system.BinaryCompanion != null) companionCount++;
-            systemName = companionCount == 1 ? "Binary" : companionCount == 2 ? "Triple" : "Multiple";
+            int starCount = system.AllStars.Count;
+            systemName = starCount == 2 ? "Binary" : starCount == 3 ? "Triple" : "Multiple";
         }
         
         return new Star
@@ -551,7 +550,14 @@ public class ScientificMilkyWayGenerator
                 if (roll < 0.005) return StellarType.F0V;
                 if (roll < 0.025) return StellarType.G5V;
                 if (roll < 0.12) return StellarType.K5V;
-                if (roll < 0.75) return StellarType.M5V;
+                if (roll < 0.73) return StellarType.M5V;    // Reduced for brown dwarfs
+                if (roll < 0.75) // 2% brown dwarfs in halo (less common)
+                {
+                    var bdRoll = (roll - 0.73) / 0.02;
+                    if (bdRoll < 0.5) return StellarType.L0;
+                    if (bdRoll < 0.8) return StellarType.L5;
+                    return StellarType.T0; // Cooler types rare in old halo
+                }
                 if (roll < 0.83) return StellarType.DA;     // 8% white dwarfs
                 if (roll < 0.93) return StellarType.K0III;  // 10% red giants
                 if (roll < 0.9995) return StellarType.M5V;  // More M dwarfs
@@ -560,12 +566,21 @@ public class ScientificMilkyWayGenerator
                 
             case StellarPopulation.ThickDisk:
                 // Intermediate age population
+                // Brown dwarfs less common in thick disk (3%)
                 if (roll < 0.0002) return StellarType.B0V;
                 if (roll < 0.002) return StellarType.A0V;
                 if (roll < 0.01) return StellarType.F0V;
                 if (roll < 0.04) return StellarType.G5V;
                 if (roll < 0.15) return StellarType.K5V;
-                if (roll < 0.77) return StellarType.M5V;
+                if (roll < 0.74) return StellarType.M5V;    // Reduced for brown dwarfs
+                if (roll < 0.77) // 3% brown dwarfs
+                {
+                    var bdRoll = (roll - 0.74) / 0.03;
+                    if (bdRoll < 0.4) return StellarType.L0;
+                    if (bdRoll < 0.7) return StellarType.L5;
+                    if (bdRoll < 0.9) return StellarType.T0;
+                    return StellarType.T5;
+                }
                 if (roll < 0.83) return StellarType.DA;     // 6% white dwarfs
                 if (roll < 0.90) return StellarType.K0III;  // 7% red giants
                 if (roll < 0.9995) return StellarType.M5V;  // More M dwarfs
@@ -574,6 +589,10 @@ public class ScientificMilkyWayGenerator
             case StellarPopulation.ThinDisk:
                 // Check if in spiral arm for star formation
                 var spiralBoost = CalculateSpiralArmDensity(position) - 1.0f;
+                
+                // Brown dwarfs are less common in dense regions
+                var densityFactor = galacticRadius < 3000 ? 0.3f : 1.0f; // 70% reduction in central regions
+                var brownDwarfRate = 0.06f * densityFactor; // 6% base rate in disc
                 
                 // Young population in spiral arms
                 if (spiralBoost > 0.2 && roll < 0.001 * (1 + spiralBoost))
@@ -584,7 +603,16 @@ public class ScientificMilkyWayGenerator
                 if (roll < 0.03 + 0.01 * spiralBoost) return StellarType.F0V;
                 if (roll < 0.076) return StellarType.G5V;
                 if (roll < 0.121) return StellarType.K5V;
-                if (roll < 0.885) return StellarType.M5V;
+                if (roll < 0.885 - brownDwarfRate) return StellarType.M5V; // Reduced to make room for brown dwarfs
+                if (roll < 0.885) // Brown dwarfs
+                {
+                    var bdRoll = (roll - (0.885 - brownDwarfRate)) / brownDwarfRate;
+                    if (bdRoll < 0.3) return StellarType.L0;     // 30% of brown dwarfs
+                    if (bdRoll < 0.5) return StellarType.L5;     // 20% of brown dwarfs
+                    if (bdRoll < 0.7) return StellarType.T0;     // 20% of brown dwarfs
+                    if (bdRoll < 0.9) return StellarType.T5;     // 20% of brown dwarfs
+                    return StellarType.Y0;                       // 10% of brown dwarfs
+                }
                 if (roll < 0.915) return StellarType.DA;    // 3% white dwarfs
                 if (roll < 0.945) return StellarType.K0III; // 3% red giants
                 if (roll < 0.9997) return StellarType.M5V;  // More M dwarfs
@@ -598,7 +626,16 @@ public class ScientificMilkyWayGenerator
                 if (roll < 0.008) return StellarType.F0V;
                 if (roll < 0.045) return StellarType.G5V;
                 if (roll < 0.16) return StellarType.K5V;
-                if (roll < 0.70) return StellarType.M5V;
+                if (roll < 0.65) return StellarType.M5V;     // Reduced for brown dwarfs
+                if (roll < 0.70) // 5% brown dwarfs in bulge
+                {
+                    var bdRoll = (roll - 0.65) / 0.05;
+                    if (bdRoll < 0.4) return StellarType.L0;
+                    if (bdRoll < 0.7) return StellarType.L5;
+                    if (bdRoll < 0.9) return StellarType.T0;
+                    if (bdRoll < 0.98) return StellarType.T5;
+                    return StellarType.Y0;
+                }
                 if (roll < 0.78) return StellarType.DA;     // 8% white dwarfs
                 if (roll < 0.88) return StellarType.K0III;  // 10% red giants
                 if (roll < 0.9995) return StellarType.M5V;  // More M dwarfs
@@ -628,6 +665,19 @@ public class ScientificMilkyWayGenerator
                 return (0.7f, 4200f, new Vector3(1.0f, 0.85f, 0.65f), 0.4f);
             case StellarType.M5V:
                 return (0.3f, 3200f, new Vector3(1.0f, 0.6f, 0.4f), 0.04f);
+            
+            // Brown dwarfs (substellar objects)
+            case StellarType.L0:
+                return (0.078f, 2200f, new Vector3(0.7f, 0.3f, 0.2f), 0.00016f); // Dark red-brown
+            case StellarType.L5:
+                return (0.070f, 1700f, new Vector3(0.6f, 0.2f, 0.15f), 0.00008f);
+            case StellarType.T0:
+                return (0.055f, 1400f, new Vector3(0.5f, 0.15f, 0.1f), 0.00004f); // Very dark brown
+            case StellarType.T5:
+                return (0.040f, 1000f, new Vector3(0.4f, 0.1f, 0.08f), 0.00001f);
+            case StellarType.Y0:
+                return (0.020f, 500f, new Vector3(0.3f, 0.05f, 0.05f), 0.000002f); // Almost invisible
+            
             case StellarType.K0III:
                 return (1.2f, 3500f, new Vector3(1.0f, 0.4f, 0.2f), 200f);
             case StellarType.B0III:
@@ -751,30 +801,22 @@ public class ScientificMilkyWayGenerator
         
         // Use UnifiedSystemGenerator for planets and companions
         var unifiedGen = new UnifiedSystemGenerator();
-        var system = unifiedGen.GenerateSystem(seed, stellarType, mass, temperature, luminosity, seed.ToString());
+        var system = unifiedGen.GenerateSystem(seed, stellarType, mass, temperature, luminosity);
         
-        // Count total planets
-        int totalPlanets = system.Children.Count(c => c is UnifiedSystemGenerator.Planet);
-        foreach (var child in system.Children)
+        // Count total planets from all stars in the system
+        int totalPlanets = 0;
+        foreach (var star in system.AllStars)
         {
-            if (child is UnifiedSystemGenerator.Star companionStar)
-            {
-                totalPlanets += companionStar.Children.Count(c => c is UnifiedSystemGenerator.Planet);
-            }
-        }
-        if (system.BinaryCompanion is UnifiedSystemGenerator.Star binaryStar)
-        {
-            totalPlanets += binaryStar.Children.Count(c => c is UnifiedSystemGenerator.Planet);
+            totalPlanets += star.Children.Count(c => c is UnifiedSystemGenerator.Planet);
         }
         
         // Check for multiple system
-        bool isMultiple = system.Children.Any(c => c is UnifiedSystemGenerator.Star) || system.BinaryCompanion != null;
+        bool isMultiple = system.AllStars.Count > 1;
         string systemName = "Single";
         if (isMultiple)
         {
-            int companionCount = system.Children.Count(c => c is UnifiedSystemGenerator.Star);
-            if (system.BinaryCompanion != null) companionCount++;
-            systemName = companionCount == 1 ? "Binary" : companionCount == 2 ? "Triple" : "Multiple";
+            int starCount = system.AllStars.Count;
+            systemName = starCount == 2 ? "Binary" : starCount == 3 ? "Triple" : "Multiple";
         }
         
         return new Star

@@ -4,8 +4,8 @@ using System.Linq;
 using System.Text;
 
 /// <summary>
-/// Unified system generator that creates hierarchical stellar and planetary systems
-/// Supports sub-binaries, binary planets, binary moons, and complex orbital arrangements
+/// Unified system generator - Improved hierarchical stellar and planetary systems
+/// Clearer relationships between binaries, satellites, planets, and moons
 /// </summary>
 public class UnifiedSystemGenerator
 {
@@ -15,16 +15,25 @@ public class UnifiedSystemGenerator
     {
         Star,
         Planet,
-        Moon,
-        Asteroid,
-        Comet
+        Moon
     }
     
     public enum PlanetType
     {
-        Rocky,
-        Gas,
-        Ice
+        Ferria,    // Iron-rich rocky planets (Mercury-like)
+        Carbonia,  // Carbon-rich rocky planets
+        Aquaria,   // Ocean worlds with substantial water
+        Terra,     // Earth-like rocky planets with moderate volatiles
+        Selena,    // Airless rocky worlds (Moon-like)
+        Neptune,   // Ice giants (Neptune/Uranus-like)
+        Jupiter    // Gas giants (Jupiter/Saturn-like)
+    }
+    
+    public enum StarRelationship
+    {
+        Primary,      // The main star
+        Binary,       // Close binary companion
+        Satellite     // Distant companion star
     }
     
     /// <summary>
@@ -40,10 +49,8 @@ public class UnifiedSystemGenerator
         public List<SystemObject> Children { get; set; } = new List<SystemObject>();
         public double OrbitalDistance { get; set; } // AU from parent
         public double OrbitalPeriod { get; set; } // Years
-        public bool IsBinary { get; set; } // True if this object has a binary companion at same level
-        public SystemObject? BinaryCompanion { get; set; }
         
-        public abstract string GetTreeDisplay(int indent = 0);
+        public abstract string GetTreeDisplay(int indent = 0, bool isLast = false);
     }
     
     /// <summary>
@@ -55,33 +62,43 @@ public class UnifiedSystemGenerator
         public double Temperature { get; set; }
         public double Luminosity { get; set; }
         public double Radius { get; set; }
+        public StarRelationship Relationship { get; set; }
+        public Star? BinaryCompanion { get; set; } // Direct binary companion
         
         public Star()
         {
             Type = ObjectType.Star;
         }
         
-        public override string GetTreeDisplay(int indent = 0)
+        public override string GetTreeDisplay(int indent = 0, bool isLast = false)
         {
             var sb = new StringBuilder();
             var prefix = new string(' ', indent);
+            var connector = isLast ? "└─" : "├─";
             var typeStr = StellarType.ToString();
             
-            sb.AppendLine($"{prefix}├─ {Name} [{typeStr}, {Mass:F3} M☉, {Temperature:F0}K]");
+            // Display star info
+            var relStr = Relationship == StarRelationship.Binary ? " (binary)" : 
+                        Relationship == StarRelationship.Satellite ? " (satellite)" : "";
+            sb.AppendLine($"{prefix}{connector} {Name} [{typeStr}, {Mass:F3} M☉, {Temperature:F0}K]{relStr}");
             
-            // For binary stars, show them as a pair
-            if (BinaryCompanion != null && BinaryCompanion is Star binaryStar && 
-                string.Compare(Name, binaryStar.Name) < 0) // Only show once, for the alphabetically first star
+            // Display orbital info for non-primary stars
+            if (Relationship != StarRelationship.Primary && OrbitalDistance > 0)
             {
-                sb.AppendLine($"{prefix}│  └─ {binaryStar.Name} [{binaryStar.StellarType}, {binaryStar.Mass:F3} M☉] (binary with {Name.Split(' ').Last()} @ {binaryStar.OrbitalDistance:F2} AU)");
+                var childPrefix = new string(' ', indent + 3);
+                sb.AppendLine($"{childPrefix}Separation: {OrbitalDistance:F2} AU");
             }
             
-            // Show children (skip binary companions as they're shown inline)
-            foreach (var child in Children)
+            // Show planets
+            var planets = Children.Where(c => c is Planet).ToList();
+            if (planets.Any())
             {
-                if (child != BinaryCompanion)
+                var childPrefix = new string(' ', indent + 3);
+                sb.AppendLine($"{childPrefix}Planets ({planets.Count}):");
+                
+                for (int i = 0; i < planets.Count; i++)
                 {
-                    sb.Append(child.GetTreeDisplay(indent + 3));
+                    sb.Append(planets[i].GetTreeDisplay(indent + 6, i == planets.Count - 1));
                 }
             }
             
@@ -90,7 +107,7 @@ public class UnifiedSystemGenerator
     }
     
     /// <summary>
-    /// Planet object - can have moons or binary planet companions
+    /// Planet object - can have moons
     /// </summary>
     public class Planet : SystemObject
     {
@@ -98,33 +115,32 @@ public class UnifiedSystemGenerator
         public double Radius { get; set; } // Earth radii
         public double Temperature { get; set; } // Kelvin
         public bool HasRings { get; set; }
+        public Planet? BinaryCompanion { get; set; } // For binary planets
         
         public Planet()
         {
             Type = ObjectType.Planet;
         }
         
-        public override string GetTreeDisplay(int indent = 0)
+        public override string GetTreeDisplay(int indent = 0, bool isLast = false)
         {
             var sb = new StringBuilder();
             var prefix = new string(' ', indent);
+            var connector = isLast ? "└─" : "├─";
             
-            var distanceStr = $", {OrbitalDistance:F2} AU";
-            sb.AppendLine($"{prefix}├─ {Name} [{PlanetType}, {Mass:F2} M⊕{distanceStr}]");
+            var binaryStr = BinaryCompanion != null ? " (binary)" : "";
+            sb.AppendLine($"{prefix}{connector} Planet {Name} [{PlanetType}, {Mass:F2} M⊕, {OrbitalDistance:F2} AU]{binaryStr}");
             
-            // Show binary companion as sub-item if this planet comes first
-            if (BinaryCompanion != null && BinaryCompanion is Planet binaryPlanet && 
-                Parent != null && Parent.Children.IndexOf(this) < Parent.Children.IndexOf(BinaryCompanion))
+            // Show moons
+            var moons = Children.Where(c => c is Moon).ToList();
+            if (moons.Any())
             {
-                sb.AppendLine($"{prefix}│  └─ {binaryPlanet.Name} [{binaryPlanet.PlanetType}, {binaryPlanet.Mass:F2} M⊕] (binary with {Name.Split(' ').Last()})");
-            }
-            
-            // Show moons (skip binary companions as they're shown inline)
-            foreach (var child in Children)
-            {
-                if (child != BinaryCompanion)
+                var childPrefix = new string(' ', indent + 3);
+                sb.AppendLine($"{childPrefix}Moons ({moons.Count}):");
+                
+                for (int i = 0; i < moons.Count; i++)
                 {
-                    sb.Append(child.GetTreeDisplay(indent + 3));
+                    sb.Append(moons[i].GetTreeDisplay(indent + 6, i == moons.Count - 1));
                 }
             }
             
@@ -133,31 +149,73 @@ public class UnifiedSystemGenerator
     }
     
     /// <summary>
-    /// Moon object - can have binary moon companions
+    /// Moon object
     /// </summary>
     public class Moon : SystemObject
     {
         public PlanetType Composition { get; set; }
         public double Radius { get; set; } // Moon radii (relative to our Moon)
+        public Moon? BinaryCompanion { get; set; } // For binary moons
         
         public Moon()
         {
             Type = ObjectType.Moon;
         }
         
-        public override string GetTreeDisplay(int indent = 0)
+        public override string GetTreeDisplay(int indent = 0, bool isLast = false)
         {
             var sb = new StringBuilder();
             var prefix = new string(' ', indent);
+            var connector = isLast ? "└─" : "├─";
             
-            sb.AppendLine($"{prefix}├─ {Name} [{Composition}, {Mass:F4} M☾]");
+            var binaryStr = BinaryCompanion != null ? " (binary)" : "";
+            sb.AppendLine($"{prefix}{connector} Moon {Name} [{Composition}, {Mass:F4} M☾]{binaryStr}");
             
-            // Show binary companion as sub-item if this moon comes first
-            if (BinaryCompanion != null && BinaryCompanion is Moon binaryMoon && 
-                Parent != null && Parent.Children.IndexOf(this) < Parent.Children.IndexOf(BinaryCompanion))
+            return sb.ToString();
+        }
+    }
+    
+    /// <summary>
+    /// Complete star system containing all stars and their planets/moons
+    /// </summary>
+    public class StarSystem
+    {
+        public long Seed { get; set; }
+        public Star PrimaryStar { get; set; } = null!;
+        public List<Star> AllStars { get; set; } = new List<Star>();
+        
+        public string GetFullTreeDisplay()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine($"\n═══ Star System {Seed} ═══");
+            
+            // First show primary star
+            sb.AppendLine("\nStars in System:");
+            sb.Append(PrimaryStar.GetTreeDisplay(0, false));
+            
+            // Then show binary companion if exists
+            if (PrimaryStar.BinaryCompanion != null)
             {
-                sb.AppendLine($"{prefix}│  └─ {binaryMoon.Name} [{binaryMoon.Composition}, {binaryMoon.Mass:F4} M☾] (binary with {Name.Last()})");
+                sb.Append(PrimaryStar.BinaryCompanion.GetTreeDisplay(0, false));
             }
+            
+            // Then show satellite stars
+            var satellites = AllStars.Where(s => s.Relationship == StarRelationship.Satellite)
+                                   .OrderBy(s => s.Name).ToList();
+            for (int i = 0; i < satellites.Count; i++)
+            {
+                sb.Append(satellites[i].GetTreeDisplay(0, i == satellites.Count - 1));
+                
+                // Show binary companion of satellite if exists
+                if (satellites[i].BinaryCompanion != null)
+                {
+                    sb.Append(satellites[i].BinaryCompanion!.GetTreeDisplay(3, true));
+                }
+            }
+            
+            sb.AppendLine($"\nTotal Stars: {AllStars.Count}");
+            sb.AppendLine($"Total Planets: {AllStars.Sum(s => s.Children.Count(c => c is Planet))}");
+            sb.AppendLine($"Total Moons: {AllStars.SelectMany(s => s.Children.OfType<Planet>()).Sum(p => p.Children.Count)}");
             
             return sb.ToString();
         }
@@ -170,144 +228,129 @@ public class UnifiedSystemGenerator
     /// <summary>
     /// Generate a complete hierarchical system for a star
     /// </summary>
-    public Star GenerateSystem(long seed, ScientificMilkyWayGenerator.StellarType stellarType, 
-        double stellarMass, double temperature, double luminosity, string baseName)
+    public StarSystem GenerateSystem(long seed, ScientificMilkyWayGenerator.StellarType stellarType, 
+        double stellarMass, double temperature, double luminosity)
     {
         var rng = new Random((int)(seed % int.MaxValue));
+        
+        var system = new StarSystem { Seed = seed };
         
         // Create primary star
         var primaryStar = new Star
         {
             Id = seed.ToString(),
-            Name = seed.ToString(),  // Just use seed, no prefix
+            Name = "A",
             StellarType = stellarType,
             Mass = stellarMass,
             Temperature = temperature,
             Luminosity = luminosity,
-            Radius = CalculateStellarRadius(stellarMass, temperature)
+            Radius = CalculateStellarRadius(stellarMass, temperature),
+            Relationship = StarRelationship.Primary
         };
         
-        // Check for stellar companions
-        GenerateStellarCompanions(primaryStar, seed, rng);
+        system.PrimaryStar = primaryStar;
+        system.AllStars.Add(primaryStar);
+        
+        // Generate stellar companions
+        GenerateStellarCompanions(system, seed, rng);
         
         // Generate planetary systems for all stars
-        GeneratePlanetarySystems(primaryStar, seed, rng);
+        foreach (var star in system.AllStars)
+        {
+            GeneratePlanetarySystem(star, seed, rng);
+        }
         
-        return primaryStar;
+        return system;
     }
     
     /// <summary>
-    /// Generate stellar companions (including sub-binaries)
+    /// Generate stellar companions with clear binary/satellite relationships
     /// </summary>
-    private void GenerateStellarCompanions(Star primaryStar, long seed, Random rng)
+    private void GenerateStellarCompanions(StarSystem system, long seed, Random rng)
     {
         var roll = rng.NextDouble();
         
-        // Determine companion configuration
-        if (roll < 0.005) // 0.5% chance of complex system
+        if (roll < 0.001) // 0.1% quadruple system (2 binary pairs)
         {
-            // Hierarchical triple or quadruple system
-            GenerateHierarchicalSystem(primaryStar, seed, rng);
+            // Primary A gets binary companion B
+            var companionB = GenerateCompanionStar(system.PrimaryStar, seed, rng, "B", StarRelationship.Binary);
+            companionB.OrbitalDistance = 0.05 + rng.NextDouble() * 0.5; // 0.05-0.55 AU
+            system.PrimaryStar.BinaryCompanion = companionB;
+            companionB.BinaryCompanion = system.PrimaryStar;
+            system.AllStars.Add(companionB);
+            
+            // Distant binary pair C and D
+            var companionC = GenerateCompanionStar(system.PrimaryStar, seed, rng, "C", StarRelationship.Satellite);
+            companionC.OrbitalDistance = 100 + rng.NextDouble() * 400; // 100-500 AU from A-B
+            system.AllStars.Add(companionC);
+            
+            var companionD = GenerateCompanionStar(companionC, seed, rng, "D", StarRelationship.Binary);
+            companionD.OrbitalDistance = 0.5 + rng.NextDouble() * 2; // 0.5-2.5 AU from C
+            companionC.BinaryCompanion = companionD;
+            companionD.BinaryCompanion = companionC;
+            system.AllStars.Add(companionD);
         }
-        else if (roll < 0.07) // 6.5% chance of simple binary
+        else if (roll < 0.01) // 0.9% triple system
         {
-            // Simple binary system
-            var companion = GenerateCompanionStar(primaryStar, seed, rng, "B");
-            companion.OrbitalDistance = Math.Pow(10, rng.NextDouble() * 3 - 1); // 0.1-100 AU
-            primaryStar.Children.Add(companion);
-            companion.Parent = primaryStar;
+            var config = rng.NextDouble();
+            
+            if (config < 0.5) // A-B close binary + distant C
+            {
+                // Binary companion B
+                var companionB = GenerateCompanionStar(system.PrimaryStar, seed, rng, "B", StarRelationship.Binary);
+                companionB.OrbitalDistance = 0.05 + rng.NextDouble() * 0.5; // 0.05-0.55 AU
+                system.PrimaryStar.BinaryCompanion = companionB;
+                companionB.BinaryCompanion = system.PrimaryStar;
+                system.AllStars.Add(companionB);
+                
+                // Distant companion C
+                var companionC = GenerateCompanionStar(system.PrimaryStar, seed, rng, "C", StarRelationship.Satellite);
+                companionC.OrbitalDistance = 50 + rng.NextDouble() * 450; // 50-500 AU
+                system.AllStars.Add(companionC);
+            }
+            else // A alone + distant B-C binary
+            {
+                // Satellite B with binary companion C
+                var companionB = GenerateCompanionStar(system.PrimaryStar, seed, rng, "B", StarRelationship.Satellite);
+                companionB.OrbitalDistance = 50 + rng.NextDouble() * 450; // 50-500 AU from A
+                system.AllStars.Add(companionB);
+                
+                var companionC = GenerateCompanionStar(companionB, seed, rng, "C", StarRelationship.Binary);
+                companionC.OrbitalDistance = 0.1 + rng.NextDouble() * 1; // 0.1-1.1 AU from B
+                companionB.BinaryCompanion = companionC;
+                companionC.BinaryCompanion = companionB;
+                system.AllStars.Add(companionC);
+            }
         }
-    }
-    
-    /// <summary>
-    /// Generate hierarchical stellar system (sub-binaries)
-    /// </summary>
-    private void GenerateHierarchicalSystem(Star primaryStar, long seed, Random rng)
-    {
-        var config = rng.NextDouble();
-        
-        if (config < 0.4) // Close binary + distant companion
+        else if (roll < 0.07) // 6% binary system
         {
-            // Primary becomes A, gets a close binary companion B
-            primaryStar.Name = primaryStar.Id + " A";
-            var closeCompanion = GenerateCompanionStar(primaryStar, seed, rng, "B");
-            closeCompanion.OrbitalDistance = 0.01 + rng.NextDouble() * 0.5; // 0.01-0.5 AU
-            primaryStar.BinaryCompanion = closeCompanion;
-            closeCompanion.BinaryCompanion = primaryStar;
-            primaryStar.IsBinary = true;
-            closeCompanion.IsBinary = true;
-            
-            // Don't add B to A's children since it's a binary companion
-            
-            // Distant third star C
-            var distantCompanion = GenerateCompanionStar(primaryStar, seed, rng, "C");
-            distantCompanion.OrbitalDistance = 50 + rng.NextDouble() * 450; // 50-500 AU
-            primaryStar.Children.Add(distantCompanion);
-            distantCompanion.Parent = primaryStar;
+            var companionB = GenerateCompanionStar(system.PrimaryStar, seed, rng, "B", StarRelationship.Binary);
+            companionB.OrbitalDistance = 0.1 + rng.NextDouble() * 10; // 0.1-10.1 AU
+            system.PrimaryStar.BinaryCompanion = companionB;
+            companionB.BinaryCompanion = system.PrimaryStar;
+            system.AllStars.Add(companionB);
         }
-        else if (config < 0.7) // Two separate binaries
-        {
-            // Primary becomes A with companion B
-            primaryStar.Name = primaryStar.Id + " A";
-            var companion1 = GenerateCompanionStar(primaryStar, seed, rng, "B");
-            companion1.OrbitalDistance = 0.1 + rng.NextDouble() * 1; // 0.1-1 AU
-            primaryStar.BinaryCompanion = companion1;
-            companion1.BinaryCompanion = primaryStar;
-            primaryStar.IsBinary = true;
-            companion1.IsBinary = true;
-            
-            // Don't add B to A's children since it's a binary companion
-            
-            // Secondary binary pair C and D at distance
-            var secondary = GenerateCompanionStar(primaryStar, seed, rng, "C");
-            var secondaryCompanion = GenerateCompanionStar(primaryStar, seed, rng, "D");
-            secondary.OrbitalDistance = 100 + rng.NextDouble() * 400; // 100-500 AU
-            secondaryCompanion.OrbitalDistance = 0.5 + rng.NextDouble() * 2; // 0.5-2.5 AU from C
-            
-            secondary.BinaryCompanion = secondaryCompanion;
-            secondaryCompanion.BinaryCompanion = secondary;
-            secondary.IsBinary = true;
-            secondaryCompanion.IsBinary = true;
-            
-            primaryStar.Children.Add(secondary);
-            secondary.Parent = primaryStar;
-            secondary.Children.Add(secondaryCompanion);
-            secondaryCompanion.Parent = secondary;
-        }
-        else // Triple with one distant
-        {
-            // Close binary A and B
-            primaryStar.Name = primaryStar.Id + " A";
-            var closeCompanion = GenerateCompanionStar(primaryStar, seed, rng, "B");
-            closeCompanion.OrbitalDistance = 0.05 + rng.NextDouble() * 0.5; // 0.05-0.5 AU
-            primaryStar.BinaryCompanion = closeCompanion;
-            closeCompanion.BinaryCompanion = primaryStar;
-            primaryStar.IsBinary = true;
-            closeCompanion.IsBinary = true;
-            
-            // Don't add B to A's children since it's a binary companion
-            
-            // Two distant companions C and D
-            var distant1 = GenerateCompanionStar(primaryStar, seed, rng, "C");
-            var distant2 = GenerateCompanionStar(primaryStar, seed, rng, "D");
-            distant1.OrbitalDistance = 50 + rng.NextDouble() * 200; // 50-250 AU
-            distant2.OrbitalDistance = 300 + rng.NextDouble() * 700; // 300-1000 AU
-            
-            primaryStar.Children.Add(distant1);
-            primaryStar.Children.Add(distant2);
-            distant1.Parent = primaryStar;
-            distant2.Parent = primaryStar;
-        }
+        // else single star system
     }
     
     /// <summary>
     /// Generate a companion star
     /// </summary>
-    private Star GenerateCompanionStar(Star primary, long seed, Random rng, string designation)
+    private Star GenerateCompanionStar(Star primary, long seed, Random rng, string designation, StarRelationship relationship)
     {
-        // Mass ratio typically 0.1-0.9 of primary
-        var massRatio = 0.1 + rng.NextDouble() * 0.8;
-        var mass = primary.Mass * massRatio;
+        // Mass ratio - allow for brown dwarf companions
+        double mass;
+        if (rng.NextDouble() < 0.15) // 15% chance of brown dwarf companion
+        {
+            // Brown dwarf mass range: 0.013-0.08 solar masses
+            mass = 0.013 + rng.NextDouble() * 0.067;
+        }
+        else
+        {
+            // Normal stellar companion
+            var massRatio = 0.1 + rng.NextDouble() * 0.8;
+            mass = primary.Mass * massRatio;
+        }
         
         // Determine stellar type based on mass
         var stellarType = DetermineStellarTypeFromMass(mass, rng);
@@ -316,155 +359,219 @@ public class UnifiedSystemGenerator
         
         var companion = new Star
         {
-            Id = $"{seed} {designation}",
-            Name = $"{primary.Id.Split(' ')[0]} {designation}",
+            Id = $"{seed}-{designation}",
+            Name = designation,
             StellarType = stellarType,
             Mass = mass,
             Temperature = temperature,
             Luminosity = luminosity,
-            Radius = CalculateStellarRadius(mass, temperature)
+            Radius = CalculateStellarRadius(mass, temperature),
+            Relationship = relationship
         };
         
         return companion;
     }
     
     /// <summary>
-    /// Generate planetary systems for all stars in the system
+    /// Generate planetary system for a star
     /// </summary>
-    private void GeneratePlanetarySystems(Star star, long seed, Random rng)
+    private void GeneratePlanetarySystem(Star star, long seed, Random rng)
     {
         // Check if this star can have planets
         if (!CanHavePlanets(star.StellarType)) return;
         
         // Binary stars have reduced planet formation
-        if (star.IsBinary && rng.NextDouble() > 0.3) return;
+        if (star.BinaryCompanion != null && rng.NextDouble() > 0.3) return;
         
         // Generate planets
         var planetCount = DeterminePlanetCount(star, rng);
         var currentDistance = 0.1 + rng.NextDouble() * 0.3; // 0.1-0.4 AU start
         
+        var planetIndex = 1;
         for (int i = 0; i < planetCount; i++)
         {
-            var planet = GeneratePlanet(star, seed, rng, i + 1, currentDistance);
+            var planet = GeneratePlanet(star, seed, rng, planetIndex, currentDistance);
             star.Children.Add(planet);
             planet.Parent = star;
+            planetIndex++;
             
             // Check for binary planet (rare)
-            if (rng.NextDouble() < 0.02 && i < planetCount - 1) // 2% chance, skip last planet
+            if (rng.NextDouble() < 0.02 && i < planetCount - 1) // 2% chance
             {
-                var binaryPlanet = GenerateBinaryPlanet(planet, seed, rng);
+                var binaryPlanet = GeneratePlanet(star, seed, rng, planetIndex, currentDistance);
+                binaryPlanet.Mass = planet.Mass * (0.3 + rng.NextDouble() * 0.6); // 30-90% of primary
+                binaryPlanet.Radius = CalculatePlanetRadius(binaryPlanet.Mass, binaryPlanet.PlanetType);
+                
                 planet.BinaryCompanion = binaryPlanet;
                 binaryPlanet.BinaryCompanion = planet;
-                planet.IsBinary = true;
-                binaryPlanet.IsBinary = true;
-                
-                // Don't add to children - will be shown as binary companion
-                // But still skip next planet number since we used it
-                i++;
+                star.Children.Add(binaryPlanet);
+                binaryPlanet.Parent = star;
+                planetIndex++;
             }
             
-            // Generate moons
+            // Generate moons for the planet(s)
             GenerateMoons(planet, seed, rng);
+            if (planet.BinaryCompanion != null)
+            {
+                GenerateMoons(planet.BinaryCompanion, seed, rng);
+            }
             
             // Next planet distance
             currentDistance *= 1.4 + rng.NextDouble() * 0.4; // 1.4-1.8x spacing
         }
-        
-        // Recursively generate for stellar companions
-        foreach (var child in star.Children.Where(c => c is Star))
-        {
-            GeneratePlanetarySystems((Star)child, seed + 1000, rng);
-        }
     }
     
     /// <summary>
-    /// Generate a planet
+    /// Generate a planet with scientifically accurate mass distributions and types
     /// </summary>
     private Planet GeneratePlanet(Star star, long seed, Random rng, int index, double distance)
     {
         var planet = new Planet
         {
-            Id = $"{star.Id.Split(' ')[0]} {index}",
-            Name = $"{star.Id.Split(' ')[0]} {index}",
+            Id = $"{star.Id}-{index}",
+            Name = index.ToString(),
             OrbitalDistance = distance
         };
         
-        // Determine planet type based on distance and stellar properties
-        var frostLine = Math.Sqrt(star.Luminosity) * 2.7; // AU
+        // Calculate key boundaries
+        var frostLine = Math.Sqrt(star.Luminosity) * 2.7; // Snow line in AU
+        var sootLine = Math.Sqrt(star.Luminosity) * 0.2;  // Carbon condensation line
+        var rockLine = Math.Sqrt(star.Luminosity) * 0.7;  // Silicate condensation line
         
-        if (distance < frostLine * 0.5)
+        // Temperature at this distance (rough estimate)
+        var temp = EstimatePlanetTemperature(star, distance);
+        
+        // Determine planet mass using realistic occurrence rates
+        double mass = GeneratePlanetMass(rng, distance, frostLine);
+        planet.Mass = mass;
+        
+        // Determine planet type based on mass, temperature, and composition
+        if (mass < 0.5) // Small rocky worlds
         {
-            // Hot rocky planet
-            planet.PlanetType = PlanetType.Rocky;
-            planet.Mass = 0.1 + rng.NextDouble() * 2; // 0.1-2.1 Earth masses
-        }
-        else if (distance < frostLine)
-        {
-            // Temperate rocky or small gas
-            if (rng.NextDouble() < 0.7)
+            if (distance < sootLine)
             {
-                planet.PlanetType = PlanetType.Rocky;
-                planet.Mass = 0.5 + rng.NextDouble() * 3; // 0.5-3.5 Earth masses
+                planet.PlanetType = PlanetType.Ferria; // Iron-rich like Mercury
+            }
+            else if (distance < rockLine)
+            {
+                planet.PlanetType = PlanetType.Selena; // Airless rocky
+            }
+            else if (temp > 350)
+            {
+                planet.PlanetType = PlanetType.Carbonia; // Carbon-rich in hot zones
             }
             else
             {
-                planet.PlanetType = PlanetType.Gas;
-                planet.Mass = 5 + rng.NextDouble() * 20; // 5-25 Earth masses (Neptune-like)
+                planet.PlanetType = PlanetType.Selena; // Default small rocky
             }
         }
-        else if (distance < frostLine * 3)
+        else if (mass < 2.0) // Earth-mass range
         {
-            // Gas giants
-            planet.PlanetType = PlanetType.Gas;
-            planet.Mass = 20 + rng.NextDouble() * 300; // 20-320 Earth masses
-        }
-        else
-        {
-            // Ice giants or ice worlds
-            if (rng.NextDouble() < 0.6)
+            if (distance < rockLine * 0.5)
             {
-                planet.PlanetType = PlanetType.Ice;
-                planet.Mass = 10 + rng.NextDouble() * 40; // 10-50 Earth masses
+                planet.PlanetType = PlanetType.Ferria; // Very hot, atmosphere lost
+            }
+            else if (distance < frostLine && temp > 250 && temp < 350)
+            {
+                planet.PlanetType = PlanetType.Terra; // Potentially habitable
+            }
+            else if (distance > frostLine && mass > 1.0)
+            {
+                planet.PlanetType = PlanetType.Aquaria; // Water-rich
+            }
+            else if (rng.NextDouble() < 0.1)
+            {
+                planet.PlanetType = PlanetType.Carbonia; // 10% chance of carbon world
             }
             else
             {
-                planet.PlanetType = PlanetType.Ice;
-                planet.Mass = 0.1 + rng.NextDouble() * 5; // 0.1-5.1 Earth masses (ice dwarfs)
+                planet.PlanetType = PlanetType.Terra; // Generic terrestrial
+            }
+        }
+        else if (mass < 10.0) // Super-Earth range
+        {
+            if (distance < frostLine * 0.5)
+            {
+                // Hot super-Earths are often rocky
+                planet.PlanetType = rng.NextDouble() < 0.7 ? PlanetType.Terra : PlanetType.Neptune;
+            }
+            else if (distance > frostLine * 1.5)
+            {
+                // Cold super-Earths are usually mini-Neptunes
+                planet.PlanetType = PlanetType.Neptune;
+            }
+            else
+            {
+                // Transition zone - could be either
+                planet.PlanetType = rng.NextDouble() < 0.4 ? PlanetType.Aquaria : PlanetType.Neptune;
+            }
+        }
+        else if (mass < 50.0) // Neptune-mass range
+        {
+            planet.PlanetType = PlanetType.Neptune;
+        }
+        else // Jupiter-mass range
+        {
+            planet.PlanetType = PlanetType.Jupiter;
+        }
+        
+        // Special case: very hot Jupiters can lose their envelopes
+        if (planet.PlanetType == PlanetType.Jupiter && distance < 0.1)
+        {
+            if (rng.NextDouble() < 0.2) // 20% chance
+            {
+                planet.PlanetType = PlanetType.Neptune; // Envelope stripped
+                planet.Mass *= 0.3; // Reduce mass
             }
         }
         
         planet.Radius = CalculatePlanetRadius(planet.Mass, planet.PlanetType);
-        planet.Temperature = EstimatePlanetTemperature(star, distance);
+        planet.Temperature = temp;
         planet.OrbitalPeriod = Math.Sqrt(Math.Pow(distance, 3) / star.Mass); // Kepler's third law
         
         return planet;
     }
     
     /// <summary>
-    /// Generate a binary planet companion
+    /// Generate planet mass based on occurrence rates from exoplanet surveys
     /// </summary>
-    private Planet GenerateBinaryPlanet(Planet primary, long seed, Random rng)
+    private double GeneratePlanetMass(Random rng, double distance, double frostLine)
     {
-        // Get next planet number - binary companion gets next sequential number
-        var parentStar = primary.Parent as Star;
-        var primaryIndex = int.Parse(primary.Name.Split(' ').Last());
-        var nextNumber = primaryIndex + 1;
+        var roll = rng.NextDouble();
         
-        var companion = new Planet
+        if (distance < 0.1) // Very hot zone
         {
-            Id = $"{primary.Id.Split(' ')[0]} {nextNumber}",
-            Name = $"{primary.Id.Split(' ')[0]} {nextNumber}",
-            PlanetType = primary.PlanetType,
-            Mass = primary.Mass * (0.3 + rng.NextDouble() * 0.6), // 30-90% of primary mass
-            OrbitalDistance = primary.OrbitalDistance, // Same distance from star
-            Parent = primary.Parent
-        };
-        
-        companion.Radius = CalculatePlanetRadius(companion.Mass, companion.PlanetType);
-        companion.Temperature = primary.Temperature;
-        companion.OrbitalPeriod = primary.OrbitalPeriod;
-        
-        return companion;
+            // Hot Jupiters are rare but do exist
+            if (roll < 0.01) return 100 + rng.NextDouble() * 900; // 100-1000 Earth masses
+            else if (roll < 0.05) return 10 + rng.NextDouble() * 40; // Hot Neptunes
+            else if (roll < 0.15) return 2 + rng.NextDouble() * 8; // Hot super-Earths
+            else return 0.1 + rng.NextDouble() * 2; // Hot rocky planets
+        }
+        else if (distance < frostLine) // Inner system
+        {
+            // Based on Kepler occurrence rates
+            if (roll < 0.02) return 100 + rng.NextDouble() * 200; // Rare warm Jupiters
+            else if (roll < 0.10) return 10 + rng.NextDouble() * 40; // Mini-Neptunes
+            else if (roll < 0.35) return 1.5 + rng.NextDouble() * 8.5; // Super-Earths (common!)
+            else if (roll < 0.60) return 0.5 + rng.NextDouble() * 1.5; // Earth-like
+            else return 0.05 + rng.NextDouble() * 0.5; // Small rocky
+        }
+        else if (distance < frostLine * 3) // Outer system
+        {
+            // Gas giant zone
+            if (roll < 0.15) return 50 + rng.NextDouble() * 350; // Jupiter-like
+            else if (roll < 0.35) return 10 + rng.NextDouble() * 40; // Neptune-like
+            else if (roll < 0.50) return 2 + rng.NextDouble() * 8; // Ice-rich super-Earths
+            else return 0.1 + rng.NextDouble() * 2; // Small icy bodies
+        }
+        else // Far outer system
+        {
+            // Distant ice giants and dwarfs
+            if (roll < 0.05) return 50 + rng.NextDouble() * 150; // Distant giants (rare)
+            else if (roll < 0.20) return 10 + rng.NextDouble() * 40; // Ice giants
+            else if (roll < 0.40) return 1 + rng.NextDouble() * 9; // Large icy bodies
+            else return 0.01 + rng.NextDouble() * 1; // Small icy bodies
+        }
     }
     
     /// <summary>
@@ -472,45 +579,69 @@ public class UnifiedSystemGenerator
     /// </summary>
     private void GenerateMoons(Planet planet, long seed, Random rng)
     {
-        // Rocky planets have fewer moons
-        int maxMoons = planet.PlanetType == PlanetType.Rocky ? 2 : 
-                      planet.Mass > 100 ? 20 : 8; // Gas giants can have many moons
+        // Determine max moons based on planet type and mass
+        int maxMoons = planet.PlanetType switch
+        {
+            PlanetType.Jupiter => (int)(5 + Math.Sqrt(planet.Mass) * 0.5), // Many moons
+            PlanetType.Neptune => (int)(2 + Math.Sqrt(planet.Mass) * 0.3), // Moderate moons
+            PlanetType.Terra => planet.Mass > 0.8 ? 2 : 1,    // Earth can have 1-2
+            PlanetType.Aquaria => planet.Mass > 2 ? 3 : 1,    // Ocean worlds might capture more
+            PlanetType.Ferria => 0,                           // Too close to star usually
+            PlanetType.Carbonia => 1,                         // Rare to have moons
+            PlanetType.Selena => 0,                           // Small bodies rarely have moons
+            _ => 1
+        };
         
         var moonCount = rng.Next(0, maxMoons + 1);
         var letters = "abcdefghijklmnopqrstuvwxyz";
         
+        var moonIndex = 0;
         for (int i = 0; i < moonCount; i++)
         {
             var moon = new Moon
             {
-                Id = $"{planet.Id}{letters[i]}",
-                Name = $"{planet.Name}{letters[i]}",
+                Id = $"{planet.Id}-{letters[moonIndex]}",
+                Name = letters[moonIndex].ToString(),
                 OrbitalDistance = 0.001 + rng.NextDouble() * 0.01 // Very close, in AU
             };
             
-            // Moon properties based on planet type
-            if (planet.PlanetType == PlanetType.Gas)
+            // Moon properties based on planet type and location
+            if (planet.PlanetType == PlanetType.Jupiter || planet.PlanetType == PlanetType.Neptune)
             {
-                moon.Composition = rng.NextDouble() < 0.7 ? PlanetType.Ice : PlanetType.Rocky;
-                moon.Mass = 0.00001 + rng.NextDouble() * 0.01; // Tiny to Ganymede-sized
+                // Gas/ice giant moons
+                if (rng.NextDouble() < 0.3)
+                {
+                    // Large moon (like Galilean satellites)
+                    moon.Mass = 0.001 + rng.NextDouble() * 0.025; // Up to Ganymede-sized
+                    moon.Composition = planet.OrbitalDistance > 5 ? PlanetType.Aquaria : 
+                                      rng.NextDouble() < 0.5 ? PlanetType.Selena : PlanetType.Aquaria;
+                }
+                else
+                {
+                    // Small moon
+                    moon.Mass = 0.00001 + rng.NextDouble() * 0.001;
+                    moon.Composition = PlanetType.Selena; // Small moons are usually just rock/ice
+                }
             }
             else
             {
-                moon.Composition = PlanetType.Rocky;
-                moon.Mass = 0.000001 + rng.NextDouble() * 0.001; // Very small
+                // Terrestrial planet moons (rare and small)
+                moon.Composition = PlanetType.Selena; // Airless bodies
+                moon.Mass = 0.000001 + rng.NextDouble() * 0.02; // Up to Moon-sized (rare)
             }
             
             moon.Radius = Math.Pow(moon.Mass / 0.0123, 0.33); // Relative to our Moon
             planet.Children.Add(moon);
             moon.Parent = planet;
+            moonIndex++;
             
             // Binary moon (very rare)
             if (rng.NextDouble() < 0.01 && i < moonCount - 1) // 1% chance
             {
                 var binaryMoon = new Moon
                 {
-                    Id = $"{planet.Id}{letters[i + 1]}",
-                    Name = $"{planet.Name}{letters[i + 1]}",
+                    Id = $"{planet.Id}-{letters[moonIndex]}",
+                    Name = letters[moonIndex].ToString(),
                     Composition = moon.Composition,
                     Mass = moon.Mass * (0.4 + rng.NextDouble() * 0.5), // 40-90% of primary
                     OrbitalDistance = moon.OrbitalDistance
@@ -519,15 +650,10 @@ public class UnifiedSystemGenerator
                 binaryMoon.Radius = Math.Pow(binaryMoon.Mass / 0.0123, 0.33);
                 moon.BinaryCompanion = binaryMoon;
                 binaryMoon.BinaryCompanion = moon;
-                moon.IsBinary = true;
-                binaryMoon.IsBinary = true;
-                binaryMoon.Parent = planet;
-                
-                // Add binary moon to children so it gets a place in the list
                 planet.Children.Add(binaryMoon);
-                
-                // Skip next iteration since we used the next letter
-                i++;
+                binaryMoon.Parent = planet;
+                moonIndex++;
+                i++; // Skip next iteration
             }
         }
     }
@@ -544,6 +670,11 @@ public class UnifiedSystemGenerator
                type != ScientificMilkyWayGenerator.StellarType.B0III &&
                type != ScientificMilkyWayGenerator.StellarType.M2I &&
                type != ScientificMilkyWayGenerator.StellarType.B0I &&
+               type != ScientificMilkyWayGenerator.StellarType.L0 &&     // Brown dwarfs don't have planets
+               type != ScientificMilkyWayGenerator.StellarType.L5 &&
+               type != ScientificMilkyWayGenerator.StellarType.T0 &&
+               type != ScientificMilkyWayGenerator.StellarType.T5 &&
+               type != ScientificMilkyWayGenerator.StellarType.Y0 &&
                type != ScientificMilkyWayGenerator.StellarType.DA &&
                type != ScientificMilkyWayGenerator.StellarType.NS &&
                type != ScientificMilkyWayGenerator.StellarType.BH &&
@@ -572,11 +703,17 @@ public class UnifiedSystemGenerator
     
     private double CalculatePlanetRadius(double mass, PlanetType type)
     {
+        // Based on empirical mass-radius relationships from exoplanet data
         return type switch
         {
-            PlanetType.Rocky => Math.Pow(mass, 0.27), // Earth radii
-            PlanetType.Gas => 4.0 + Math.Log10(mass), // Approximate for gas giants
-            PlanetType.Ice => Math.Pow(mass, 0.33), // Between rocky and gas
+            PlanetType.Ferria => Math.Pow(mass, 0.26),        // Dense iron-rich (like Mercury)
+            PlanetType.Selena => Math.Pow(mass, 0.28),        // Airless rocky (like Moon)
+            PlanetType.Terra => mass < 2 ? Math.Pow(mass, 0.28) : Math.Pow(mass, 0.59), // Earth-like with transition
+            PlanetType.Carbonia => Math.Pow(mass, 0.30),      // Less dense carbon-rich
+            PlanetType.Aquaria => Math.Pow(mass, 0.35),       // Lower density due to water/ice
+            PlanetType.Neptune => 2.0 + 0.6 * Math.Log10(mass), // Ice giant scaling
+            PlanetType.Jupiter => mass < 100 ? 3.0 + 0.5 * Math.Log10(mass) : 
+                                 9.0 + 0.1 * Math.Log10(mass/100), // Gas giant with saturation
             _ => 1.0
         };
     }
@@ -595,7 +732,14 @@ public class UnifiedSystemGenerator
         if (mass > 0.9) return ScientificMilkyWayGenerator.StellarType.G0V;
         if (mass > 0.7) return ScientificMilkyWayGenerator.StellarType.K0V;
         if (mass > 0.3) return ScientificMilkyWayGenerator.StellarType.M0V;
-        return ScientificMilkyWayGenerator.StellarType.M5V;
+        if (mass > 0.08) return ScientificMilkyWayGenerator.StellarType.M5V;
+        
+        // Brown dwarf range (0.013 - 0.08 solar masses)
+        if (mass > 0.075) return ScientificMilkyWayGenerator.StellarType.L0;
+        if (mass > 0.065) return ScientificMilkyWayGenerator.StellarType.L5;
+        if (mass > 0.050) return ScientificMilkyWayGenerator.StellarType.T0;
+        if (mass > 0.030) return ScientificMilkyWayGenerator.StellarType.T5;
+        return ScientificMilkyWayGenerator.StellarType.Y0;
     }
     
     private double EstimateTemperatureFromType(ScientificMilkyWayGenerator.StellarType type)
@@ -611,20 +755,66 @@ public class UnifiedSystemGenerator
             ScientificMilkyWayGenerator.StellarType.K0V => 5250,
             ScientificMilkyWayGenerator.StellarType.M0V => 3850,
             ScientificMilkyWayGenerator.StellarType.M5V => 3170,
+            ScientificMilkyWayGenerator.StellarType.L0 => 2200,
+            ScientificMilkyWayGenerator.StellarType.L5 => 1700,
+            ScientificMilkyWayGenerator.StellarType.T0 => 1400,
+            ScientificMilkyWayGenerator.StellarType.T5 => 1000,
+            ScientificMilkyWayGenerator.StellarType.Y0 => 500,
             _ => 5778
         };
     }
     
     #endregion
     
+    #region Investigation Support
+    
     /// <summary>
-    /// Display the complete system tree
+    /// Find an object in the system by its ID suffix (e.g., "A", "B", "1", "2-a")
     /// </summary>
-    public static string GetSystemTreeDisplay(Star rootStar)
+    public SystemObject? FindObjectBySuffix(StarSystem system, string suffix)
     {
-        var sb = new StringBuilder();
-        sb.AppendLine($"\n═══ System Tree for {rootStar.Id} ═══");
-        sb.Append(rootStar.GetTreeDisplay());
-        return sb.ToString();
+        // Check if it's a star (single letter)
+        if (suffix.Length == 1 && char.IsLetter(suffix[0]) && char.IsUpper(suffix[0]))
+        {
+            return system.AllStars.FirstOrDefault(s => s.Name == suffix);
+        }
+        
+        // Parse planet/moon identifiers
+        var parts = suffix.Split('-');
+        
+        // Find the parent star (if specified)
+        Star? parentStar = system.PrimaryStar;
+        int partIndex = 0;
+        
+        // Check if first part is a star designation
+        if (parts.Length > 0 && parts[0].Length == 1 && char.IsLetter(parts[0][0]) && char.IsUpper(parts[0][0]))
+        {
+            parentStar = system.AllStars.FirstOrDefault(s => s.Name == parts[0]);
+            if (parentStar == null) return null;
+            partIndex = 1;
+        }
+        
+        // Look for planet
+        if (partIndex < parts.Length && int.TryParse(parts[partIndex], out int planetNum))
+        {
+            var planet = parentStar.Children.OfType<Planet>()
+                .FirstOrDefault(p => p.Name == planetNum.ToString());
+            
+            if (planet == null) return null;
+            
+            // Check for moon
+            if (partIndex + 1 < parts.Length)
+            {
+                var moonLetter = parts[partIndex + 1];
+                return planet.Children.OfType<Moon>()
+                    .FirstOrDefault(m => m.Name == moonLetter);
+            }
+            
+            return planet;
+        }
+        
+        return null;
     }
+    
+    #endregion
 }

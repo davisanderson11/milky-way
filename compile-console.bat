@@ -19,6 +19,11 @@ if %ERRORLEVEL% EQU 0 (
     copy /Y ChunkBasedGalaxySystem.cs ScientificMilkyWayConsole\
     copy /Y UnifiedSystemGenerator.cs ScientificMilkyWayConsole\
     copy /Y GalaxyGenerator.cs ScientificMilkyWayConsole\
+    copy /Y RoguePlanet.cs ScientificMilkyWayConsole\
+    copy /Y ScientificGalaxyVisualizer2.cs ScientificMilkyWayConsole\
+    copy /Y ChunkVisualizer.cs ScientificMilkyWayConsole\
+    copy /Y StellarTypeGenerator.cs ScientificMilkyWayConsole\
+    copy /Y Star.cs ScientificMilkyWayConsole\
     
     REM Build the project
     cd ScientificMilkyWayConsole
@@ -39,7 +44,7 @@ REM Try .NET Framework csc
 set "DOTNET_PATH=%WINDIR%\Microsoft.NET\Framework64\v4.0.30319"
 if exist "%DOTNET_PATH%\csc.exe" (
     echo Using .NET Framework compiler...
-    "%DOTNET_PATH%\csc.exe" /out:ScientificMilkyWayConsole.exe ScientificMilkyWayConsole.cs ScientificMilkyWayGenerator.cs GalacticAnalytics.cs ChunkBasedGalaxySystem.cs UnifiedSystemGenerator.cs GalaxyGenerator.cs
+    "%DOTNET_PATH%\csc.exe" /out:ScientificMilkyWayConsole.exe ScientificMilkyWayConsole.cs ScientificMilkyWayGenerator.cs GalacticAnalytics.cs ChunkBasedGalaxySystem.cs UnifiedSystemGenerator.cs GalaxyGenerator.cs RoguePlanet.cs ScientificGalaxyVisualizer2.cs ChunkVisualizer.cs StellarTypeGenerator.cs Star.cs
     echo.
     echo Build complete! Run with: ScientificMilkyWayConsole.exe
     goto end

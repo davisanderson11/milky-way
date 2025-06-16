@@ -15,12 +15,7 @@ public class ChunkBasedGalaxySystem
     private const int MAX_ANGULAR_CHUNKS = 360; // 0-359 degrees
     private const int MAX_Z_CHUNKS = 201; // -100 to 100 (-10000 to 10000 ly) - extended for halo
     
-    private readonly ScientificMilkyWayGenerator baseGenerator;
-    
-    public ChunkBasedGalaxySystem()
-    {
-        baseGenerator = new ScientificMilkyWayGenerator();
-    }
+    // No longer need ScientificMilkyWayGenerator
     
     /// <summary>
     /// Chunk coordinate representation
@@ -125,18 +120,118 @@ public class ChunkBasedGalaxySystem
     }
     
     /// <summary>
+    /// Generate rogue planets for a chunk (deterministic)
+    /// </summary>
+    private List<RoguePlanet> GenerateRoguePlanetsForChunk(ChunkCoordinate chunk)
+    {
+        var roguePlanets = new List<RoguePlanet>();
+        var bounds = chunk.GetBounds();
+        
+        // Use chunk center for density calculation
+        // Use chunk center for density calculation
+        // Note: bounds are in cylindrical coordinates (r, theta, z)
+        var centerR = (float)((bounds.rMin + bounds.rMax) / 2);
+        var centerTheta = (float)((bounds.thetaMin + bounds.thetaMax) / 2);
+        var centerZ = (float)((bounds.zMin + bounds.zMax) / 2);
+        
+        // Convert to Cartesian for density calculation
+        float x = centerR * (float)Math.Cos(centerTheta);
+        float y = centerR * (float)Math.Sin(centerTheta);
+        var cartesianPos = new GalaxyGenerator.Vector3(x, y, centerZ);
+        
+        // Calculate rogue planet density
+        float rogueDensity = GalaxyGenerator.CalculateRoguePlanetDensity(cartesianPos);
+        
+        // Expected number of rogue planets (using chunk volume)
+        float chunkVolume = (float)((bounds.rMax - bounds.rMin) * 
+                           (bounds.rMax * (bounds.thetaMax - bounds.thetaMin)) * 
+                           (bounds.zMax - bounds.zMin));
+        float expectedRogues = rogueDensity * chunkVolume; // No scale factor needed now
+        
+        // Use Poisson-like distribution
+        var baseRng = new Random(chunk.GetHashCode() ^ unchecked((int)0x524F475545)); // "ROGUE" in hex
+        int rogueCount = 0;
+        
+        if (expectedRogues < 1)
+        {
+            if (baseRng.NextDouble() < expectedRogues)
+                rogueCount = 1;
+        }
+        else
+        {
+            rogueCount = (int)expectedRogues;
+            if (baseRng.NextDouble() < (expectedRogues - rogueCount))
+                rogueCount++;
+        }
+        
+        // Generate each rogue planet
+        for (int i = 0; i < rogueCount; i++)
+        {
+            // Generate position within chunk
+            var rng = new Random(chunk.GetHashCode() ^ i ^ unchecked((int)0x524F475545));
+            
+            float r = (float)(bounds.rMin + rng.NextDouble() * (bounds.rMax - bounds.rMin));
+            float theta = (float)(bounds.thetaMin + rng.NextDouble() * (bounds.thetaMax - bounds.thetaMin));
+            float z = (float)(bounds.zMin + rng.NextDouble() * (bounds.zMax - bounds.zMin));
+            
+            // Convert to Cartesian
+            float px = r * (float)Math.Cos(theta);
+            float py = r * (float)Math.Sin(theta);
+            var position = new GalaxyGenerator.Vector3(px, py, z);
+            
+            // Create seed with negative index
+            long rogueSeed = EncodeSeed(chunk.R, chunk.Theta, chunk.Z, (long)i | 0x800000000L); // Set high bit for negative
+            
+            var rogue = RoguePlanet.Generate(rogueSeed, position, chunk.R, chunk.Theta, chunk.Z, -(i + 1));
+            roguePlanets.Add(rogue);
+        }
+        
+        return roguePlanets;
+    }
+    
+    /// <summary>
+    /// Check if a seed refers to a rogue planet
+    /// </summary>
+    public static bool IsRoguePlanetSeed(long seed)
+    {
+        var (_, _, _, index) = DecodeSeed(seed);
+        return (index & 0x800000000) != 0;
+    }
+    
+    /// <summary>
     /// Get a star by its seed
     /// </summary>
-    public ScientificMilkyWayGenerator.Star GetStarBySeed(long seed)
+    public Star GetStarBySeed(long seed)
     {
         // Special case for Sagittarius A*
         if (seed == 0)
         {
-            return baseGenerator.GetStarBySeed(0);
+            var sgrA = new Star
+            {
+                Seed = 0,
+                Position = GalaxyGenerator.Vector3.Zero,
+                Type = StellarTypeGenerator.StellarType.SMBH,
+                Mass = 4310000f,
+                Temperature = 0f,
+                Luminosity = 0f,
+                Color = GalaxyGenerator.Vector3.Zero,
+                Population = "Bulge",
+                Region = "Galactic Center",
+                PlanetCount = 0,
+                IsMultiple = false,
+                SystemName = "Sagittarius A*"
+            };
+            return sgrA;
         }
         
         // Decode the seed
         var (chunkR, chunkTheta, chunkZ, starIndex) = DecodeSeed(seed);
+        
+        // Check if this is a rogue planet (negative index)
+        if ((starIndex & 0x800000000) != 0)
+        {
+            throw new ArgumentException($"Seed {seed} refers to a rogue planet, not a star. Use GetRoguePlanetBySeed instead.");
+        }
         
         // Get chunk bounds
         var chunk = new ChunkCoordinate(chunkR, chunkTheta, chunkZ);
@@ -170,68 +265,51 @@ public class ChunkBasedGalaxySystem
         // Convert to Cartesian
         float x = (float)(r * Math.Cos(theta));
         float y = (float)(r * Math.Sin(theta));
-        var position = new ScientificMilkyWayGenerator.Vector3(x, y, (float)z);
+        var position = new GalaxyGenerator.Vector3(x, y, (float)z);
         
-        // Use the same generation method as the visualizer!
-        var star = baseGenerator.GenerateStarAtPosition(position);
-        
-        // Override the seed to maintain chunk-based addressing
-        star.Seed = seed;
-        
-        // Generate unified system with companions and planets
-        var unifiedGen = new UnifiedSystemGenerator();
-        var systemRoot = unifiedGen.GenerateSystem(seed, star.Type, star.Mass, 
-            star.Temperature, star.Luminosity, seed.ToString());
-        
-        // Count total planets across all stars in the system
-        int totalPlanets = 0;
-        
-        // Count planets for primary star
-        totalPlanets += systemRoot.Children.Count(c => c is UnifiedSystemGenerator.Planet);
-        
-        // Count planets for any companion stars
-        foreach (var child in systemRoot.Children)
-        {
-            if (child is UnifiedSystemGenerator.Star companionStar)
-            {
-                totalPlanets += companionStar.Children.Count(c => c is UnifiedSystemGenerator.Planet);
-            }
-        }
-        
-        // Check if binary companion exists
-        if (systemRoot.BinaryCompanion is UnifiedSystemGenerator.Star binaryCompanion)
-        {
-            totalPlanets += binaryCompanion.Children.Count(c => c is UnifiedSystemGenerator.Planet);
-        }
-        
-        star.PlanetCount = totalPlanets;
-        
-        // Check for multiple star system
-        bool hasCompanions = systemRoot.Children.Any(c => c is UnifiedSystemGenerator.Star) || 
-                            systemRoot.BinaryCompanion != null;
-        star.IsMultiple = hasCompanions;
-        
-        // Generate system name
-        if (hasCompanions)
-        {
-            int companionCount = systemRoot.Children.Count(c => c is UnifiedSystemGenerator.Star);
-            if (systemRoot.BinaryCompanion != null) companionCount++;
-            
-            if (companionCount == 1)
-                star.SystemName = "Binary";
-            else if (companionCount == 2)
-                star.SystemName = "Triple";
-            else if (companionCount == 3)
-                star.SystemName = "Quadruple";
-            else
-                star.SystemName = $"Multiple ({companionCount + 1} stars)";
-        }
-        else
-        {
-            star.SystemName = "Single";
-        }
+        // Generate star using unified system
+        var star = Star.GenerateAtPosition(position, seed);
         
         return star;
+    }
+    
+    /// <summary>
+    /// Get a rogue planet by its seed
+    /// </summary>
+    public RoguePlanet GetRoguePlanetBySeed(long seed)
+    {
+        // Decode the seed
+        var (chunkR, chunkTheta, chunkZ, index) = DecodeSeed(seed);
+        
+        // Check if this is actually a star
+        if ((index & 0x800000000) == 0)
+        {
+            throw new ArgumentException($"Seed {seed} refers to a star, not a rogue planet. Use GetStarBySeed instead.");
+        }
+        
+        // Get the actual rogue planet index
+        long rogueIndex = index & 0x7FFFFFFFF;
+        
+        // Get chunk
+        var chunk = new ChunkCoordinate(chunkR, chunkTheta, chunkZ);
+        var bounds = chunk.GetBounds();
+        
+        // Generate position deterministically
+        var rng = new Random(chunk.GetHashCode() ^ (int)rogueIndex ^ unchecked((int)0x524F475545));
+        
+        float r = (float)(bounds.rMin + rng.NextDouble() * (bounds.rMax - bounds.rMin));
+        float theta = (float)(bounds.thetaMin + rng.NextDouble() * (bounds.thetaMax - bounds.thetaMin));
+        float z = (float)(bounds.zMin + rng.NextDouble() * (bounds.zMax - bounds.zMin));
+        
+        // Convert to Cartesian
+        float px = r * (float)Math.Cos(theta);
+        float py = r * (float)Math.Sin(theta);
+        var position = new GalaxyGenerator.Vector3(px, py, z);
+        
+        // Generate the rogue planet
+        var rogue = RoguePlanet.Generate(seed, position, chunkR, chunkTheta, chunkZ, -(int)(rogueIndex + 1));
+        
+        return rogue;
     }
     
     /// <summary>
@@ -291,10 +369,10 @@ public class ChunkBasedGalaxySystem
     /// <summary>
     /// Generate all stars in a chunk - SUPER FAST!
     /// </summary>
-    public List<ScientificMilkyWayGenerator.Star> GenerateChunkStars(string chunkId)
+    public List<Star> GenerateChunkStars(string chunkId)
     {
         var chunk = new ChunkCoordinate(chunkId);
-        var stars = new List<ScientificMilkyWayGenerator.Star>();
+        var stars = new List<Star>();
         
         // First add special objects (like Sgr A*)
         var bounds = chunk.GetBounds();
@@ -317,6 +395,23 @@ public class ChunkBasedGalaxySystem
     }
     
     /// <summary>
+    /// Generate all objects in a chunk (stars and optionally rogue planets)
+    /// </summary>
+    public (List<Star> stars, List<RoguePlanet>? roguePlanets) GenerateChunkObjects(string chunkId, bool includeRoguePlanets = false)
+    {
+        var stars = GenerateChunkStars(chunkId);
+        
+        List<RoguePlanet>? roguePlanets = null;
+        if (includeRoguePlanets)
+        {
+            var chunk = new ChunkCoordinate(chunkId);
+            roguePlanets = GenerateRoguePlanetsForChunk(chunk);
+        }
+        
+        return (stars, roguePlanets);
+    }
+    
+    /// <summary>
     /// Find which chunk a position belongs to
     /// </summary>
     public ChunkCoordinate GetChunkForPosition(float x, float y, float z)
@@ -335,7 +430,7 @@ public class ChunkBasedGalaxySystem
     /// <summary>
     /// Investigate a chunk and export to CSV
     /// </summary>
-    public void InvestigateChunk(string chunkId, string? outputPath = null)
+    public void InvestigateChunk(string chunkId, string? outputPath = null, bool includeRoguePlanets = false)
     {
         var chunk = new ChunkCoordinate(chunkId);
         var bounds = chunk.GetBounds();
@@ -375,6 +470,28 @@ public class ChunkBasedGalaxySystem
         var densityRatio = actualDensity / expectedDensity;
         Console.WriteLine($"Actual density: {actualDensity:E3} stars/ly³");
         Console.WriteLine($"Density ratio (actual/expected): {densityRatio:F2}");
+        Console.WriteLine($"Region: {GalaxyGenerator.DetermineRegion(centerPos)}");
+        
+        // Generate rogue planets if requested
+        List<RoguePlanet>? roguePlanets = null;
+        if (includeRoguePlanets)
+        {
+            roguePlanets = GenerateRoguePlanetsForChunk(chunk);
+            Console.WriteLine($"\nRogue planets in chunk: {roguePlanets.Count}");
+            
+            if (roguePlanets.Count > 0)
+            {
+                var rogueTypes = roguePlanets.GroupBy(r => r.Type).OrderByDescending(g => g.Count());
+                Console.WriteLine("Rogue planet types:");
+                foreach (var group in rogueTypes)
+                {
+                    Console.WriteLine($"  {group.Key}: {group.Count()} ({group.Count() * 100.0 / roguePlanets.Count:F1}%)");
+                }
+                
+                // Rogue-to-star ratio
+                Console.WriteLine($"Rogue-to-star ratio: 1:{(stars.Count > 0 ? stars.Count / (double)Math.Max(1, roguePlanets.Count) : 0):F1}");
+            }
+        }
         
         // Statistics
         if (stars.Count > 0)
@@ -383,35 +500,75 @@ public class ChunkBasedGalaxySystem
             Console.WriteLine("\nStellar types:");
             foreach (var group in typeGroups)
             {
-                Console.WriteLine($"  {group.Key}: {group.Count()} ({group.Count() * 100.0 / stars.Count:F1}%)");
+                string typeDisplay = group.Key.ToString();
+                Console.WriteLine($"  {typeDisplay}: {group.Count()} ({group.Count() * 100.0 / stars.Count:F1}%)");
             }
         }
         
         // Export to CSV
         if (outputPath == null)
         {
-            outputPath = $"chunk_{chunkId}_data.csv";
+            outputPath = includeRoguePlanets ? $"chunk_{chunkId}_with_rogues_data.csv" : $"chunk_{chunkId}_data.csv";
         }
         
         using (var writer = new StreamWriter(outputPath))
         {
-            writer.WriteLine("ChunkID,Seed,X,Y,Z,R,Theta,Type,Mass,Temperature,Luminosity,ColorR,ColorG,ColorB,Population,Region,Planets,IsMultiple,SystemName");
-            
-            foreach (var star in stars)
+            if (includeRoguePlanets && roguePlanets != null && roguePlanets.Count > 0)
             {
-                var r = Math.Sqrt(star.Position.X * star.Position.X + star.Position.Y * star.Position.Y);
-                var theta = Math.Atan2(star.Position.Y, star.Position.X) * 180 / Math.PI;
-                if (theta < 0) theta += 360;
+                // Include rogue planets - different CSV format
+                writer.WriteLine("ChunkID,ObjectType,Index,Seed,X,Y,Z,R,Theta,Type,Mass,Radius,Temperature,Luminosity,ColorR,ColorG,ColorB,Population,Region,Planets,IsMultiple,SystemName,MoonCount,Origin");
                 
-                writer.WriteLine($"{chunk},{star.Seed},{star.Position.X:F2},{star.Position.Y:F2},{star.Position.Z:F2}," +
-                    $"{r:F2},{theta:F2},{star.Type},{star.Mass:F3},{star.Temperature:F0},{star.Luminosity:F4}," +
-                    $"{star.Color.X:F3},{star.Color.Y:F3},{star.Color.Z:F3},{star.Population},{star.Region},{star.PlanetCount}," +
-                    $"{star.IsMultiple},{star.SystemName}");
+                // Write stars
+                foreach (var star in stars)
+                {
+                    var r = Math.Sqrt(star.Position.X * star.Position.X + star.Position.Y * star.Position.Y);
+                    var theta = Math.Atan2(star.Position.Y, star.Position.X) * 180 / Math.PI;
+                    if (theta < 0) theta += 360;
+                    
+                    // Decode to get star index
+                    var (_, _, _, starIndex) = DecodeSeed(star.Seed);
+                    
+                    writer.WriteLine($"{chunk},Star,{starIndex},{star.Seed},{star.Position.X:F2},{star.Position.Y:F2},{star.Position.Z:F2}," +
+                        $"{r:F2},{theta:F2},{star.Type},{star.Mass:F3},0,{star.Temperature:F0},{star.Luminosity:F4}," +
+                        $"{star.Color.X:F3},{star.Color.Y:F3},{star.Color.Z:F3},{star.Population},{star.Region},{star.PlanetCount}," +
+                        $"{star.IsMultiple},{star.SystemName},,");
+                }
+                
+                // Write rogue planets
+                foreach (var rogue in roguePlanets)
+                {
+                    var r = Math.Sqrt(rogue.Position.X * rogue.Position.X + rogue.Position.Y * rogue.Position.Y);
+                    var theta = Math.Atan2(rogue.Position.Y, rogue.Position.X) * 180 / Math.PI;
+                    if (theta < 0) theta += 360;
+                    
+                    writer.WriteLine($"{chunk},RoguePlanet,{rogue.Index},{rogue.Seed},{rogue.Position.X:F2},{rogue.Position.Y:F2},{rogue.Position.Z:F2}," +
+                        $"{r:F2},{theta:F2},{rogue.Type},{rogue.Mass:F3},{rogue.Radius:F1},{rogue.Temperature:F0},0," +
+                        $"0,0,0,,,0," +
+                        $"false,Rogue,{rogue.MoonCount},{rogue.Origin}");
+                }
+            }
+            else
+            {
+                // Standard star-only format
+                writer.WriteLine("ChunkID,Seed,X,Y,Z,R,Theta,Type,Mass,Temperature,Luminosity,ColorR,ColorG,ColorB,Population,Region,Planets,IsMultiple,SystemName");
+                
+                foreach (var star in stars)
+                {
+                    var r = Math.Sqrt(star.Position.X * star.Position.X + star.Position.Y * star.Position.Y);
+                    var theta = Math.Atan2(star.Position.Y, star.Position.X) * 180 / Math.PI;
+                    if (theta < 0) theta += 360;
+                    
+                    writer.WriteLine($"{chunk},{star.Seed},{star.Position.X:F2},{star.Position.Y:F2},{star.Position.Z:F2}," +
+                        $"{r:F2},{theta:F2},{star.Type},{star.Mass:F3},{star.Temperature:F0},{star.Luminosity:F4}," +
+                        $"{star.Color.X:F3},{star.Color.Y:F3},{star.Color.Z:F3},{star.Population},{star.Region},{star.PlanetCount}," +
+                        $"{star.IsMultiple},{star.SystemName}");
+                }
             }
         }
         
         Console.WriteLine($"Data exported to: {outputPath}");
     }
+    
     
     /// <summary>
     /// Estimate total star count using density formula integration
@@ -439,12 +596,14 @@ public class ChunkBasedGalaxySystem
         {
             var pos = new GalaxyGenerator.Vector3(x, y, z);
             var density = GalaxyGenerator.GetExpectedStarDensity(pos);
-            Console.WriteLine($"  {desc}: {density:E3} stars/ly³");
+            var rogueDensity = GalaxyGenerator.CalculateRoguePlanetDensity(pos);
+            Console.WriteLine($"  {desc}: {density:E3} stars/ly³, {rogueDensity:E3} rogues/ly³");
         }
         Console.WriteLine();
         
         var startTime = DateTime.Now;
         double totalStars = 0;
+        double totalRogues = 0;
         
         // Integration parameters - sample points for numerical integration
         // Use logarithmic sampling in radius to better capture high density regions
@@ -471,6 +630,7 @@ public class ChunkBasedGalaxySystem
             double dr = r_next - r; // Width of this radial shell
             
             double ringDensity = 0;
+            double ringRogues = 0;
             
             for (int j = 0; j < thetaSamples; j++)
             {
@@ -487,22 +647,25 @@ public class ChunkBasedGalaxySystem
                     
                     // Get density at this point
                     double density = GalaxyGenerator.GetExpectedStarDensity(pos);
+                    double rogueDensity = GalaxyGenerator.CalculateRoguePlanetDensity(pos); // No scale factor needed
                     
                     // Volume element in cylindrical coordinates
                     double dV = r * dr * dtheta * dz;
                     
                     ringDensity += density * dV;
+                    ringRogues += rogueDensity * dV;
                 }
             }
             
             totalStars += ringDensity;
+            totalRogues += ringRogues;
             
             // Progress update
             if (i % 50 == 0 && i > 0)
             {
                 var elapsed = (DateTime.Now - startTime).TotalSeconds;
                 Console.WriteLine($"Progress: {i}/{rSamples} ({i * 100.0 / rSamples:F1}%), " +
-                    $"r={r:F0} ly, Running total: {totalStars:E2} stars");
+                    $"r={r:F0} ly, Running total: {totalStars:E2} stars, {totalRogues:E2} rogues");
             }
         }
         
@@ -513,9 +676,11 @@ public class ChunkBasedGalaxySystem
         Console.WriteLine($"Radial sampling: logarithmic from {minRadius} to {maxRadius} ly");
         Console.WriteLine($"Integration time: {totalTime:F1} seconds");
         Console.WriteLine($"\nEstimated total stars in galaxy: {totalStars:E2} ({totalStars:N0})");
+        Console.WriteLine($"Estimated total rogue planets: {totalRogues:E2} ({totalRogues:N0})");
         
         // Compare to expected 225 billion
         double ratio = totalStars / 225e9;
         Console.WriteLine($"\nRatio to 225 billion target: {ratio:F2}x");
+        Console.WriteLine($"Rogue planet to star ratio: {totalRogues / totalStars:F2}:1");
     }
 }

@@ -444,7 +444,7 @@ public class ChunkVisualizer
     // Helper class to avoid dynamic type issues
     private class StarPosition
     {
-        public ScientificMilkyWayGenerator.Star Star { get; set; }
+        public Star Star { get; set; }
         public float X { get; set; }
         public float Y { get; set; }
         public float Z { get; set; }

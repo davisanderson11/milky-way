@@ -17,8 +17,8 @@ public static class GalacticAnalytics
     {
         public long Seed { get; set; }
         public string Name { get; set; } = "";
-        public ScientificMilkyWayGenerator.Vector3 Position { get; set; }
-        public ScientificMilkyWayGenerator.StellarType Type { get; set; }
+        public GalaxyGenerator.Vector3 Position { get; set; }
+        public StellarTypeGenerator.StellarType Type { get; set; }
         public float Mass { get; set; }
         public float Temperature { get; set; }
         public float Luminosity { get; set; }
@@ -35,8 +35,8 @@ public static class GalacticAnalytics
         {
             Seed = 0,
             Name = "Sagittarius A*",
-            Position = new ScientificMilkyWayGenerator.Vector3(0, 0, 0),
-            Type = ScientificMilkyWayGenerator.StellarType.SMBH,
+            Position = new GalaxyGenerator.Vector3(0, 0, 0),
+            Type = StellarTypeGenerator.StellarType.SMBH,
             Mass = 4_310_000f,
             Temperature = 0f,
             Luminosity = 0f,
@@ -47,10 +47,10 @@ public static class GalacticAnalytics
     /// <summary>
     /// Get all special objects within a chunk's bounds
     /// </summary>
-    public static List<ScientificMilkyWayGenerator.Star> GetSpecialObjectsInChunk(
+    public static List<Star> GetSpecialObjectsInChunk(
         double rMin, double rMax, double thetaMin, double thetaMax, double zMin, double zMax)
     {
-        var stars = new List<ScientificMilkyWayGenerator.Star>();
+        var stars = new List<Star>();
         
         foreach (var obj in SpecialObjects)
         {
@@ -68,20 +68,20 @@ public static class GalacticAnalytics
                 z >= zMin && z < zMax)
             {
                 // Convert to Star object
-                var star = new ScientificMilkyWayGenerator.Star
+                var star = new Star
                 {
                     Seed = obj.Seed,
-                    Position = obj.Position,
+                    Position = new GalaxyGenerator.Vector3(obj.Position.X, obj.Position.Y, obj.Position.Z),
                     Type = obj.Type,
                     Mass = obj.Mass,
                     Temperature = obj.Temperature,
                     Luminosity = obj.Luminosity,
-                    Color = CalculateStarColor(obj.Temperature),
-                    Population = DeterminePopulation(obj.Position),
+                    Color = CalculateStarColorUnified(obj.Temperature),
+                    Population = DeterminePopulationUnified(obj.Position),
                     Region = obj.Name, // Use name as region for special objects
                     PlanetCount = 0, // Special objects don't have planets
                     IsMultiple = false,
-                    SystemName = obj.Seed.ToString()
+                    SystemName = obj.Name // Use name instead of seed
                 };
                 
                 stars.Add(star);
@@ -137,70 +137,58 @@ public static class GalacticAnalytics
     /// <summary>
     /// Calculate star color from temperature (simplified blackbody)
     /// </summary>
-    private static ScientificMilkyWayGenerator.Vector3 CalculateStarColor(float temperature)
+    // No longer needed - using StellarTypeGenerator.StellarType directly
+    
+    private static GalaxyGenerator.Vector3 CalculateStarColorUnified(float temperature)
     {
-        if (temperature <= 0) return new ScientificMilkyWayGenerator.Vector3(0, 0, 0);
+        if (temperature <= 0) return new GalaxyGenerator.Vector3(0, 0, 0);
         
         float r, g, b;
         
         if (temperature < 3500)
         {
+            // Red stars
             r = 1.0f;
-            g = 0.3f;
+            g = temperature / 3500f * 0.5f;
             b = 0.0f;
         }
         else if (temperature < 5000)
         {
+            // Orange stars
             r = 1.0f;
-            g = 0.6f;
-            b = 0.2f;
+            g = 0.5f + (temperature - 3500f) / 1500f * 0.3f;
+            b = (temperature - 3500f) / 1500f * 0.2f;
         }
         else if (temperature < 6000)
         {
+            // Yellow stars
             r = 1.0f;
-            g = 0.9f;
-            b = 0.7f;
-        }
-        else if (temperature < 7500)
-        {
-            r = 0.9f;
-            g = 0.9f;
-            b = 1.0f;
+            g = 0.8f + (temperature - 5000f) / 1000f * 0.2f;
+            b = 0.2f + (temperature - 5000f) / 1000f * 0.3f;
         }
         else if (temperature < 10000)
         {
-            r = 0.7f;
-            g = 0.8f;
-            b = 1.0f;
+            // White stars
+            r = 1.0f;
+            g = 1.0f;
+            b = 0.5f + (temperature - 6000f) / 4000f * 0.5f;
         }
         else
         {
-            r = 0.6f;
-            g = 0.7f;
+            // Blue stars
+            r = 0.7f + (10000f / temperature) * 0.3f;
+            g = 0.8f + (10000f / temperature) * 0.2f;
             b = 1.0f;
         }
         
-        return new ScientificMilkyWayGenerator.Vector3(r, g, b);
+        return new GalaxyGenerator.Vector3(r, g, b);
     }
     
-    /// <summary>
-    /// Determine stellar population based on position
-    /// </summary>
-    private static ScientificMilkyWayGenerator.StellarPopulation DeterminePopulation(
-        ScientificMilkyWayGenerator.Vector3 position)
+    private static string DeterminePopulationUnified(GalaxyGenerator.Vector3 position)
     {
-        var r = Math.Sqrt(position.X * position.X + position.Y * position.Y);
-        var z = Math.Abs(position.Z);
-        
-        if (r < 1000 && z < 200)
-            return ScientificMilkyWayGenerator.StellarPopulation.PopIII;
-        else if (r < 5000 && z < 1000)
-            return ScientificMilkyWayGenerator.StellarPopulation.PopII;
-        else if (z > 5000)
-            return ScientificMilkyWayGenerator.StellarPopulation.Halo;
-        else
-            return ScientificMilkyWayGenerator.StellarPopulation.ThinDisk;
+        return GalaxyGenerator.DeterminePopulation(position).ToString();
     }
+    
     
     #endregion
 }

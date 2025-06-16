@@ -135,12 +135,13 @@ dotnet run
 
 ## Recent Changes
 
-### Unified System Generator
-- Replaced separate PlanetarySystemGenerator and MultipleStarSystems with unified approach
-- Supports hierarchical stellar systems (sub-binaries, triple/quadruple stars)
-- Binary planets and binary moons
-- Clear tree display format without "Star-" prefix
-- Visual binary indicators using └┬ connectors
+### Unified System Generator V2
+- Improved hierarchical stellar and planetary systems with clearer relationships
+- Clear distinction between binary companions (close) and satellite stars (distant)
+- Supports triple and quadruple star systems with proper hierarchy
+- Binary planets and binary moons with proper labeling
+- Clean naming scheme: Stars use A, B, C, D; Planets use 1, 2, 3; Moons use a, b, c
+- SEED-SUFFIX investigation format (e.g., 12345678-A, 12345678-1, 12345678-1-a)
 
 ## Key Features
 
@@ -169,15 +170,16 @@ For dense regions with millions of stars per chunk:
 
 ```
 # Direct seed
-12345678         # Primary star
-12345678-A       # Companion A
-12345678-1       # Planet 1
-12345678-A-2     # Planet 2 of companion A
+12345678         # Primary star system overview
+12345678-A       # Star A (primary)
+12345678-B       # Star B (binary or satellite)
+12345678-1       # Planet 1 of primary star
+12345678-B-1     # Planet 1 of star B
+12345678-1-a     # Moon a of planet 1
 
 # Chunk coordinates  
-260_0_0          # Solar neighborhood
-260_0_0_100      # Star index 100
-260_0_0_100_A    # Companion star
+260_0_0          # Solar neighborhood chunk
+260_0_0_100      # Star index 100 in chunk
 ```
 
 ## Visualizing Chunks

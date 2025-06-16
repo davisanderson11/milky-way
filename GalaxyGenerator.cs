@@ -7,6 +7,16 @@ using System.Collections.Generic;
 /// </summary>
 public static class GalaxyGenerator
 {
+    /// <summary>
+    /// Stellar population types based on age and metallicity
+    /// </summary>
+    public enum StellarPopulation
+    {
+        ThinDisk,    // Young, metal-rich (Population I)
+        ThickDisk,   // Intermediate age/metallicity
+        Bulge,       // Old, metal-rich
+        Halo         // Old, metal-poor (Population II)
+    }
     // Galaxy Structure Parameters
     public const float GALAXY_RADIUS = 60_000f; // light years
     
@@ -42,6 +52,47 @@ public static class GalaxyGenerator
         }
         
         public static Vector3 Zero => new Vector3(0, 0, 0);
+    }
+    
+    /// <summary>
+    /// Calculate the density of rogue planets at a given position.
+    /// For gameplay purposes, rogue planets are very rare - similar to number of stars.
+    /// </summary>
+    public static float CalculateRoguePlanetDensity(Vector3 position)
+    {
+        float r = position.Length2D();
+        float z = Math.Abs(position.Z);
+        float r3d = position.Length();
+        
+        // Get stellar density as base
+        float stellarDensity = GetExpectedStarDensity(position);
+        
+        // Base rogue planet rate - lower for gameplay but not too rare
+        // This gives roughly 1 rogue planet per 10-100 stars depending on location
+        float baseRate = 0.01f;
+        
+        // Halo boost - more rogues in the halo (ejected planets)
+        float haloBoost = 1.0f;
+        if (r3d > 30_000f) // In halo
+        {
+            haloBoost = 1.0f + (r3d - 30_000f) / 50_000f; // Up to 2x at edge
+        }
+        
+        // Dense region penalty - fewer rogues where they'd be captured
+        float densityPenalty = 1.0f;
+        if (stellarDensity > 0.01f) // Very dense regions (remember this is stars/ly³)
+        {
+            densityPenalty = 0.3f; // 70% reduction
+        }
+        else if (stellarDensity > 0.001f) // Moderately dense
+        {
+            densityPenalty = 0.6f; // 40% reduction
+        }
+        
+        // Height bonus - slightly more rogues above/below plane
+        float heightBonus = 1.0f + Math.Min(z / 5_000f, 0.5f);
+        
+        return stellarDensity * baseRate * haloBoost * densityPenalty * heightBonus;
     }
     
     /// <summary>
@@ -372,25 +423,25 @@ public static class GalaxyGenerator
     /// <summary>
     /// Determine stellar population based on position
     /// </summary>
-    public static ScientificMilkyWayGenerator.StellarPopulation DeterminePopulation(Vector3 position)
+    public static StellarPopulation DeterminePopulation(Vector3 position)
     {
         var r = position.Length2D();
         var z = Math.Abs(position.Z);
         var rTotal = position.Length();
         
         // Central bulge region
-        if (r < 6000) return ScientificMilkyWayGenerator.StellarPopulation.Bulge;
+        if (r < 6000) return StellarPopulation.Bulge;
         
         // Halo - far out or high above/below disk
         if (rTotal > 30000 || (z > 5000 && r > 20000))
-            return ScientificMilkyWayGenerator.StellarPopulation.Halo;
+            return StellarPopulation.Halo;
         
         // Thick disk - moderate height above disk
         if (z > 600 || (z > 400 && r > 30000))
-            return ScientificMilkyWayGenerator.StellarPopulation.ThickDisk;
+            return StellarPopulation.ThickDisk;
         
         // Thin disk - everything else
-        return ScientificMilkyWayGenerator.StellarPopulation.ThinDisk;
+        return StellarPopulation.ThinDisk;
     }
     
     /// <summary>
