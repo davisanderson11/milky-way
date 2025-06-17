@@ -292,24 +292,19 @@ public class ChunkBasedGalaxySystem
         
         // Get chunk
         var chunk = new ChunkCoordinate(chunkR, chunkTheta, chunkZ);
-        var bounds = chunk.GetBounds();
         
-        // Generate position deterministically
-        var rng = new Random(chunk.GetHashCode() ^ (int)rogueIndex ^ unchecked((int)0x524F475545));
+        // First, we need to determine how many rogue planets are actually in this chunk
+        var roguesInChunk = GenerateRoguePlanetsForChunk(chunk);
+        int rogueCount = roguesInChunk.Count;
         
-        float r = (float)(bounds.rMin + rng.NextDouble() * (bounds.rMax - bounds.rMin));
-        float theta = (float)(bounds.thetaMin + rng.NextDouble() * (bounds.thetaMax - bounds.thetaMin));
-        float z = (float)(bounds.zMin + rng.NextDouble() * (bounds.zMax - bounds.zMin));
+        // Check if the index is within bounds
+        if (rogueIndex >= rogueCount)
+        {
+            throw new ArgumentException($"Rogue planet index {rogueIndex} exceeds the count of {rogueCount} rogue planets in chunk {chunk}");
+        }
         
-        // Convert to Cartesian
-        float px = r * (float)Math.Cos(theta);
-        float py = r * (float)Math.Sin(theta);
-        var position = new GalaxyGenerator.Vector3(px, py, z);
-        
-        // Generate the rogue planet
-        var rogue = RoguePlanet.Generate(seed, position, chunkR, chunkTheta, chunkZ, -(int)(rogueIndex + 1));
-        
-        return rogue;
+        // Return the actual rogue planet from the generated list
+        return roguesInChunk[(int)rogueIndex];
     }
     
     /// <summary>

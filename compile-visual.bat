@@ -21,8 +21,6 @@ if %ERRORLEVEL% EQU 0 (
     
     REM Copy source files
     copy /Y ScientificMilkyWayConsole.cs ScientificMilkyWayVisual\Program.cs
-    copy /Y ScientificMilkyWayGenerator.cs ScientificMilkyWayVisual\
-    copy /Y ScientificGalaxyVisualizer2.cs ScientificMilkyWayVisual\
     copy /Y GalacticAnalytics.cs ScientificMilkyWayVisual\
     copy /Y ChunkBasedGalaxySystem.cs ScientificMilkyWayVisual\
     copy /Y UnifiedSystemGenerator.cs ScientificMilkyWayVisual\
@@ -31,6 +29,7 @@ if %ERRORLEVEL% EQU 0 (
     copy /Y ChunkVisualizer.cs ScientificMilkyWayVisual\
     copy /Y StellarTypeGenerator.cs ScientificMilkyWayVisual\
     copy /Y Star.cs ScientificMilkyWayVisual\
+    copy /Y DensityVisualizer.cs ScientificMilkyWayVisual\
     
     REM Add SkiaSharp package
     cd ScientificMilkyWayVisual

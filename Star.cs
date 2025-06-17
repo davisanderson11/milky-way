@@ -90,51 +90,51 @@ public class Star
     /// <summary>
     /// Convert StellarTypeGenerator type to ScientificMilkyWayGenerator type for UnifiedSystemGenerator
     /// </summary>
-    private static ScientificMilkyWayGenerator.StellarType ConvertToScientificType(StellarTypeGenerator.StellarType type)
+    private static StellarTypeGenerator.StellarType ConvertToScientificType(StellarTypeGenerator.StellarType type)
     {
         return type switch
         {
-            StellarTypeGenerator.StellarType.O5V => ScientificMilkyWayGenerator.StellarType.O5V,
-            StellarTypeGenerator.StellarType.B0V => ScientificMilkyWayGenerator.StellarType.B0V,
-            StellarTypeGenerator.StellarType.B5V => ScientificMilkyWayGenerator.StellarType.B5V,
-            StellarTypeGenerator.StellarType.A0V => ScientificMilkyWayGenerator.StellarType.A0V,
-            StellarTypeGenerator.StellarType.A5V => ScientificMilkyWayGenerator.StellarType.A5V,
-            StellarTypeGenerator.StellarType.F0V => ScientificMilkyWayGenerator.StellarType.F0V,
-            StellarTypeGenerator.StellarType.F5V => ScientificMilkyWayGenerator.StellarType.F5V,
-            StellarTypeGenerator.StellarType.G0V => ScientificMilkyWayGenerator.StellarType.G0V,
-            StellarTypeGenerator.StellarType.G5V => ScientificMilkyWayGenerator.StellarType.G5V,
-            StellarTypeGenerator.StellarType.K0V => ScientificMilkyWayGenerator.StellarType.K0V,
-            StellarTypeGenerator.StellarType.K5V => ScientificMilkyWayGenerator.StellarType.K5V,
-            StellarTypeGenerator.StellarType.M0V => ScientificMilkyWayGenerator.StellarType.M0V,
-            StellarTypeGenerator.StellarType.M5V => ScientificMilkyWayGenerator.StellarType.M5V,
-            StellarTypeGenerator.StellarType.M8V => ScientificMilkyWayGenerator.StellarType.M8V,
+            StellarTypeGenerator.StellarType.O5V => StellarTypeGenerator.StellarType.O5V,
+            StellarTypeGenerator.StellarType.B0V => StellarTypeGenerator.StellarType.B0V,
+            StellarTypeGenerator.StellarType.B5V => StellarTypeGenerator.StellarType.B5V,
+            StellarTypeGenerator.StellarType.A0V => StellarTypeGenerator.StellarType.A0V,
+            StellarTypeGenerator.StellarType.A5V => StellarTypeGenerator.StellarType.A5V,
+            StellarTypeGenerator.StellarType.F0V => StellarTypeGenerator.StellarType.F0V,
+            StellarTypeGenerator.StellarType.F5V => StellarTypeGenerator.StellarType.F5V,
+            StellarTypeGenerator.StellarType.G0V => StellarTypeGenerator.StellarType.G0V,
+            StellarTypeGenerator.StellarType.G5V => StellarTypeGenerator.StellarType.G5V,
+            StellarTypeGenerator.StellarType.K0V => StellarTypeGenerator.StellarType.K0V,
+            StellarTypeGenerator.StellarType.K5V => StellarTypeGenerator.StellarType.K5V,
+            StellarTypeGenerator.StellarType.M0V => StellarTypeGenerator.StellarType.M0V,
+            StellarTypeGenerator.StellarType.M5V => StellarTypeGenerator.StellarType.M5V,
+            StellarTypeGenerator.StellarType.M8V => StellarTypeGenerator.StellarType.M8V,
             
             // Brown dwarfs
-            StellarTypeGenerator.StellarType.L0 => ScientificMilkyWayGenerator.StellarType.L0,
-            StellarTypeGenerator.StellarType.L5 => ScientificMilkyWayGenerator.StellarType.L5,
-            StellarTypeGenerator.StellarType.T0 => ScientificMilkyWayGenerator.StellarType.T0,
-            StellarTypeGenerator.StellarType.T5 => ScientificMilkyWayGenerator.StellarType.T5,
-            StellarTypeGenerator.StellarType.Y0 => ScientificMilkyWayGenerator.StellarType.Y0,
+            StellarTypeGenerator.StellarType.L0 => StellarTypeGenerator.StellarType.L0,
+            StellarTypeGenerator.StellarType.L5 => StellarTypeGenerator.StellarType.L5,
+            StellarTypeGenerator.StellarType.T0 => StellarTypeGenerator.StellarType.T0,
+            StellarTypeGenerator.StellarType.T5 => StellarTypeGenerator.StellarType.T5,
+            StellarTypeGenerator.StellarType.Y0 => StellarTypeGenerator.StellarType.Y0,
             
             // Giants
-            StellarTypeGenerator.StellarType.G5III => ScientificMilkyWayGenerator.StellarType.G5III,
-            StellarTypeGenerator.StellarType.K0III => ScientificMilkyWayGenerator.StellarType.K0III,
-            StellarTypeGenerator.StellarType.K5III => ScientificMilkyWayGenerator.StellarType.K5III,
-            StellarTypeGenerator.StellarType.M0III => ScientificMilkyWayGenerator.StellarType.M0III,
-            StellarTypeGenerator.StellarType.B0III => ScientificMilkyWayGenerator.StellarType.B0III,
+            StellarTypeGenerator.StellarType.G5III => StellarTypeGenerator.StellarType.G5III,
+            StellarTypeGenerator.StellarType.K0III => StellarTypeGenerator.StellarType.K0III,
+            StellarTypeGenerator.StellarType.K5III => StellarTypeGenerator.StellarType.K5III,
+            StellarTypeGenerator.StellarType.M0III => StellarTypeGenerator.StellarType.M0III,
+            StellarTypeGenerator.StellarType.B0III => StellarTypeGenerator.StellarType.B0III,
             
             // Supergiants
-            StellarTypeGenerator.StellarType.M2I => ScientificMilkyWayGenerator.StellarType.M2I,
-            StellarTypeGenerator.StellarType.B0I => ScientificMilkyWayGenerator.StellarType.B0I,
+            StellarTypeGenerator.StellarType.M2I => StellarTypeGenerator.StellarType.M2I,
+            StellarTypeGenerator.StellarType.B0I => StellarTypeGenerator.StellarType.B0I,
             
             // Compact objects
-            StellarTypeGenerator.StellarType.DA => ScientificMilkyWayGenerator.StellarType.DA,
-            StellarTypeGenerator.StellarType.NS => ScientificMilkyWayGenerator.StellarType.NS,
-            StellarTypeGenerator.StellarType.BH => ScientificMilkyWayGenerator.StellarType.BH,
-            StellarTypeGenerator.StellarType.QS => ScientificMilkyWayGenerator.StellarType.NS, // Treat as neutron star
-            StellarTypeGenerator.StellarType.SMBH => ScientificMilkyWayGenerator.StellarType.SMBH,
+            StellarTypeGenerator.StellarType.DA => StellarTypeGenerator.StellarType.DA,
+            StellarTypeGenerator.StellarType.NS => StellarTypeGenerator.StellarType.NS,
+            StellarTypeGenerator.StellarType.BH => StellarTypeGenerator.StellarType.BH,
+            StellarTypeGenerator.StellarType.QS => StellarTypeGenerator.StellarType.NS, // Treat as neutron star
+            StellarTypeGenerator.StellarType.SMBH => StellarTypeGenerator.StellarType.SMBH,
             
-            _ => ScientificMilkyWayGenerator.StellarType.G5V
+            _ => StellarTypeGenerator.StellarType.G5V
         };
     }
 }

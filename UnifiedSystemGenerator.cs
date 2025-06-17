@@ -58,7 +58,7 @@ public class UnifiedSystemGenerator
     /// </summary>
     public class Star : SystemObject
     {
-        public ScientificMilkyWayGenerator.StellarType StellarType { get; set; }
+        public StellarTypeGenerator.StellarType StellarType { get; set; }
         public double Temperature { get; set; }
         public double Luminosity { get; set; }
         public double Radius { get; set; }
@@ -228,7 +228,7 @@ public class UnifiedSystemGenerator
     /// <summary>
     /// Generate a complete hierarchical system for a star
     /// </summary>
-    public StarSystem GenerateSystem(long seed, ScientificMilkyWayGenerator.StellarType stellarType, 
+    public StarSystem GenerateSystem(long seed, StellarTypeGenerator.StellarType stellarType, 
         double stellarMass, double temperature, double luminosity)
     {
         var rng = new Random((int)(seed % int.MaxValue));
@@ -662,23 +662,23 @@ public class UnifiedSystemGenerator
     
     #region Helper Methods
     
-    private bool CanHavePlanets(ScientificMilkyWayGenerator.StellarType type)
+    private bool CanHavePlanets(StellarTypeGenerator.StellarType type)
     {
-        return type != ScientificMilkyWayGenerator.StellarType.K0III &&
-               type != ScientificMilkyWayGenerator.StellarType.K5III &&
-               type != ScientificMilkyWayGenerator.StellarType.M0III &&
-               type != ScientificMilkyWayGenerator.StellarType.B0III &&
-               type != ScientificMilkyWayGenerator.StellarType.M2I &&
-               type != ScientificMilkyWayGenerator.StellarType.B0I &&
-               type != ScientificMilkyWayGenerator.StellarType.L0 &&     // Brown dwarfs don't have planets
-               type != ScientificMilkyWayGenerator.StellarType.L5 &&
-               type != ScientificMilkyWayGenerator.StellarType.T0 &&
-               type != ScientificMilkyWayGenerator.StellarType.T5 &&
-               type != ScientificMilkyWayGenerator.StellarType.Y0 &&
-               type != ScientificMilkyWayGenerator.StellarType.DA &&
-               type != ScientificMilkyWayGenerator.StellarType.NS &&
-               type != ScientificMilkyWayGenerator.StellarType.BH &&
-               type != ScientificMilkyWayGenerator.StellarType.SMBH;
+        return type != StellarTypeGenerator.StellarType.K0III &&
+               type != StellarTypeGenerator.StellarType.K5III &&
+               type != StellarTypeGenerator.StellarType.M0III &&
+               type != StellarTypeGenerator.StellarType.B0III &&
+               type != StellarTypeGenerator.StellarType.M2I &&
+               type != StellarTypeGenerator.StellarType.B0I &&
+               type != StellarTypeGenerator.StellarType.L0 &&     // Brown dwarfs don't have planets
+               type != StellarTypeGenerator.StellarType.L5 &&
+               type != StellarTypeGenerator.StellarType.T0 &&
+               type != StellarTypeGenerator.StellarType.T5 &&
+               type != StellarTypeGenerator.StellarType.Y0 &&
+               type != StellarTypeGenerator.StellarType.DA &&
+               type != StellarTypeGenerator.StellarType.NS &&
+               type != StellarTypeGenerator.StellarType.BH &&
+               type != StellarTypeGenerator.StellarType.SMBH;
     }
     
     private int DeterminePlanetCount(Star star, Random rng)
@@ -724,42 +724,42 @@ public class UnifiedSystemGenerator
         return 278 * Math.Pow(star.Luminosity / Math.Pow(distance, 2), 0.25);
     }
     
-    private ScientificMilkyWayGenerator.StellarType DetermineStellarTypeFromMass(double mass, Random rng)
+    private StellarTypeGenerator.StellarType DetermineStellarTypeFromMass(double mass, Random rng)
     {
-        if (mass > 2.0) return ScientificMilkyWayGenerator.StellarType.B5V;
-        if (mass > 1.5) return ScientificMilkyWayGenerator.StellarType.A0V;
-        if (mass > 1.2) return ScientificMilkyWayGenerator.StellarType.F0V;
-        if (mass > 0.9) return ScientificMilkyWayGenerator.StellarType.G0V;
-        if (mass > 0.7) return ScientificMilkyWayGenerator.StellarType.K0V;
-        if (mass > 0.3) return ScientificMilkyWayGenerator.StellarType.M0V;
-        if (mass > 0.08) return ScientificMilkyWayGenerator.StellarType.M5V;
+        if (mass > 2.0) return StellarTypeGenerator.StellarType.B5V;
+        if (mass > 1.5) return StellarTypeGenerator.StellarType.A0V;
+        if (mass > 1.2) return StellarTypeGenerator.StellarType.F0V;
+        if (mass > 0.9) return StellarTypeGenerator.StellarType.G0V;
+        if (mass > 0.7) return StellarTypeGenerator.StellarType.K0V;
+        if (mass > 0.3) return StellarTypeGenerator.StellarType.M0V;
+        if (mass > 0.08) return StellarTypeGenerator.StellarType.M5V;
         
         // Brown dwarf range (0.013 - 0.08 solar masses)
-        if (mass > 0.075) return ScientificMilkyWayGenerator.StellarType.L0;
-        if (mass > 0.065) return ScientificMilkyWayGenerator.StellarType.L5;
-        if (mass > 0.050) return ScientificMilkyWayGenerator.StellarType.T0;
-        if (mass > 0.030) return ScientificMilkyWayGenerator.StellarType.T5;
-        return ScientificMilkyWayGenerator.StellarType.Y0;
+        if (mass > 0.075) return StellarTypeGenerator.StellarType.L0;
+        if (mass > 0.065) return StellarTypeGenerator.StellarType.L5;
+        if (mass > 0.050) return StellarTypeGenerator.StellarType.T0;
+        if (mass > 0.030) return StellarTypeGenerator.StellarType.T5;
+        return StellarTypeGenerator.StellarType.Y0;
     }
     
-    private double EstimateTemperatureFromType(ScientificMilkyWayGenerator.StellarType type)
+    private double EstimateTemperatureFromType(StellarTypeGenerator.StellarType type)
     {
         return type switch
         {
-            ScientificMilkyWayGenerator.StellarType.O5V => 42000,
-            ScientificMilkyWayGenerator.StellarType.B0V => 30000,
-            ScientificMilkyWayGenerator.StellarType.B5V => 15400,
-            ScientificMilkyWayGenerator.StellarType.A0V => 9520,
-            ScientificMilkyWayGenerator.StellarType.F0V => 7200,
-            ScientificMilkyWayGenerator.StellarType.G0V => 6000,
-            ScientificMilkyWayGenerator.StellarType.K0V => 5250,
-            ScientificMilkyWayGenerator.StellarType.M0V => 3850,
-            ScientificMilkyWayGenerator.StellarType.M5V => 3170,
-            ScientificMilkyWayGenerator.StellarType.L0 => 2200,
-            ScientificMilkyWayGenerator.StellarType.L5 => 1700,
-            ScientificMilkyWayGenerator.StellarType.T0 => 1400,
-            ScientificMilkyWayGenerator.StellarType.T5 => 1000,
-            ScientificMilkyWayGenerator.StellarType.Y0 => 500,
+            StellarTypeGenerator.StellarType.O5V => 42000,
+            StellarTypeGenerator.StellarType.B0V => 30000,
+            StellarTypeGenerator.StellarType.B5V => 15400,
+            StellarTypeGenerator.StellarType.A0V => 9520,
+            StellarTypeGenerator.StellarType.F0V => 7200,
+            StellarTypeGenerator.StellarType.G0V => 6000,
+            StellarTypeGenerator.StellarType.K0V => 5250,
+            StellarTypeGenerator.StellarType.M0V => 3850,
+            StellarTypeGenerator.StellarType.M5V => 3170,
+            StellarTypeGenerator.StellarType.L0 => 2200,
+            StellarTypeGenerator.StellarType.L5 => 1700,
+            StellarTypeGenerator.StellarType.T0 => 1400,
+            StellarTypeGenerator.StellarType.T5 => 1000,
+            StellarTypeGenerator.StellarType.Y0 => 500,
             _ => 5778
         };
     }

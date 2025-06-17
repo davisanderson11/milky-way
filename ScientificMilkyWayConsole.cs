@@ -11,7 +11,6 @@ public class ScientificMilkyWayConsole
 {
     static void Main(string[] args)
     {
-        var generator = new ScientificMilkyWayGenerator();
         var chunkBasedSystem = new ChunkBasedGalaxySystem();
         
         while (true)
@@ -21,16 +20,12 @@ public class ScientificMilkyWayConsole
             Console.WriteLine("Mode: CHUNK-BASED SYSTEM");
             Console.WriteLine("Based on latest astronomical research (2024)");
             Console.WriteLine();
-            Console.WriteLine("1. Export stars for Unity (JSON)");
-            Console.WriteLine("2. Find star by seed");
-            // Option 3 removed (was galaxy statistics)
-            Console.WriteLine("4. Generate galaxy images (point cloud)");
-            Console.WriteLine("5. Generate density heatmaps (pure formulas)");
-            Console.WriteLine("6. Investigate galaxy chunk");
-            Console.WriteLine("7. Visualize chunk (generate images)");
-            Console.WriteLine("8. Estimate total galaxy star count");
-            // Option 9 removed (was sky view)
-            Console.WriteLine("10. Exit");
+            Console.WriteLine("1. Find star by seed");
+            Console.WriteLine("2. Investigate galaxy chunk");
+            Console.WriteLine("3. Visualize chunk (generate images)");
+            Console.WriteLine("4. Estimate total galaxy star count");
+            Console.WriteLine("5. Generate density heatmaps");
+            Console.WriteLine("6. Exit");
             Console.WriteLine();
             Console.Write("Select option: ");
             
@@ -39,33 +34,21 @@ public class ScientificMilkyWayConsole
             switch (choice)
             {
                 case "1":
-                    ExportForUnity(generator);
+                    FindStarBySeedChunkBased(chunkBasedSystem);
                     break;
                 case "2":
-                    FindStarBySeedChunkBased(chunkBasedSystem, generator);
-                    break;
-                case "3":
-                    Console.WriteLine("This option has been removed.");
-                    break;
-                case "4":
-                    GenerateGalaxyImages(generator);
-                    break;
-                case "5":
-                    GenerateDensityHeatmaps(generator);
-                    break;
-                case "6":
                     InvestigateChunkNew(chunkBasedSystem);
                     break;
-                case "7":
+                case "3":
                     VisualizeChunk(chunkBasedSystem);
                     break;
-                case "8":
+                case "4":
                     chunkBasedSystem.EstimateTotalStarCount();
                     break;
-                case "9":
-                    Console.WriteLine("This option has been removed.");
+                case "5":
+                    GenerateDensityHeatmaps();
                     break;
-                case "10":
+                case "6":
                     return;
             }
             
@@ -74,103 +57,7 @@ public class ScientificMilkyWayConsole
         }
     }
     
-    static void ExportForUnity(ScientificMilkyWayGenerator generator)
-    {
-        Console.WriteLine("\n=== Export for Unity ===");
-        Console.Write("Number of stars (1000-1000000): ");
-        
-        if (!int.TryParse(Console.ReadLine(), out int count) || count < 1000 || count > 1000000)
-        {
-            count = 100000;
-            Console.WriteLine($"Using default: {count}");
-        }
-        
-        Console.WriteLine($"\nGenerating {count:N0} stars...");
-        var stars = generator.GenerateStars(count);
-        
-        var filename = "MilkyWay_Unity_Export.json";
-        using (var writer = new StreamWriter(filename))
-        {
-            writer.WriteLine("{");
-            writer.WriteLine($"  \"generatedAt\": \"{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC\",");
-            writer.WriteLine($"  \"starCount\": {stars.Count},");
-            writer.WriteLine("  \"stars\": [");
-            
-            for (int i = 0; i < stars.Count; i++)
-            {
-                var star = stars[i];
-                writer.Write("    {");
-                writer.Write($"\"seed\":{star.Seed},");
-                writer.Write($"\"position\":[{star.Position.X:F2},{star.Position.Y:F2},{star.Position.Z:F2}],");
-                writer.Write($"\"type\":\"{star.Type}\",");
-                writer.Write($"\"mass\":{star.Mass:F3},");
-                writer.Write($"\"temperature\":{star.Temperature:F0},");
-                writer.Write($"\"luminosity\":{star.Luminosity:F4},");
-                writer.Write($"\"color\":[{star.Color.X:F3},{star.Color.Y:F3},{star.Color.Z:F3}],");
-                writer.Write($"\"population\":\"{star.Population}\",");
-                writer.Write($"\"planets\":{star.PlanetCount}");
-                writer.Write("}");
-                
-                if (i < stars.Count - 1) writer.WriteLine(",");
-                else writer.WriteLine();
-            }
-            
-            writer.WriteLine("  ]");
-            writer.WriteLine("}");
-        }
-        
-        Console.WriteLine($"✓ Exported {stars.Count:N0} stars to {filename}");
-    }
-    
-    
-    static void GenerateGalaxyImages(ScientificMilkyWayGenerator generator)
-    {
-        Console.WriteLine("\n=== Generate Galaxy Images ===");
-        Console.Write("Number of stars (100000-10000000, default 500000): ");
-        if (!int.TryParse(Console.ReadLine(), out int count) || count < 100000 || count > 10000000)
-        {
-            count = 500000;
-            Console.WriteLine($"Using default: {count:N0}");
-        }
-        
-        var visualizer = new ScientificGalaxyVisualizer2(generator);
-        visualizer.GenerateAllViews(2048, 2048, count);
-        
-        Console.WriteLine("\nImages have been saved to the current directory!");
-    }
-    
-    static void GenerateDensityHeatmaps(ScientificMilkyWayGenerator generator)
-    {
-        Console.WriteLine("\n=== Generate Density Heatmaps ===");
-        Console.WriteLine("This will create pure mathematical visualizations of galaxy density");
-        Console.WriteLine("using only the formulas from GalaxyGenerator - no star sampling!");
-        Console.WriteLine();
-        Console.Write("Image resolution (512-4096, default 2048): ");
-        
-        int resolution = 2048;
-        var input = Console.ReadLine();
-        if (!string.IsNullOrEmpty(input) && int.TryParse(input, out int res))
-        {
-            resolution = Math.Max(512, Math.Min(4096, res));
-        }
-        
-        Console.Write("\nVertical scale for side view (1-10, default 5): ");
-        float verticalScale = 5.0f;
-        input = Console.ReadLine();
-        if (!string.IsNullOrEmpty(input) && float.TryParse(input, out float vScale))
-        {
-            verticalScale = Math.Max(1.0f, Math.Min(10.0f, vScale));
-        }
-        
-        Console.WriteLine($"\nGenerating {resolution}x{resolution} density heatmaps with {verticalScale}x vertical scale...");
-        
-        var visualizer = new ScientificGalaxyVisualizer2(generator);
-        visualizer.GenerateDensityHeatmaps(resolution, resolution, verticalScale);
-        
-        Console.WriteLine("\nHeatmap images have been saved to the current directory!");
-    }
-    
-    static void FindStarBySeedChunkBased(ChunkBasedGalaxySystem chunkSystem, ScientificMilkyWayGenerator generator)
+    static void FindStarBySeedChunkBased(ChunkBasedGalaxySystem chunkSystem)
     {
         Console.WriteLine("\n=== Star Finder (Improved System) ===");
         Console.WriteLine("Seeds now encode: ChunkR_ChunkTheta_ChunkZ_StarIndex");
@@ -488,53 +375,96 @@ public class ScientificMilkyWayConsole
     }
     
     /// <summary>
-    /// Convert StellarTypeGenerator type to ScientificMilkyWayGenerator type for UnifiedSystemGenerator
+    /// Convert StellarTypeGenerator type to StellarTypeGenerator type for UnifiedSystemGenerator
     /// </summary>
-    private static ScientificMilkyWayGenerator.StellarType ConvertToScientificType(StellarTypeGenerator.StellarType type)
+    private static StellarTypeGenerator.StellarType ConvertToScientificType(StellarTypeGenerator.StellarType type)
     {
         return type switch
         {
-            StellarTypeGenerator.StellarType.O5V => ScientificMilkyWayGenerator.StellarType.O5V,
-            StellarTypeGenerator.StellarType.B0V => ScientificMilkyWayGenerator.StellarType.B0V,
-            StellarTypeGenerator.StellarType.B5V => ScientificMilkyWayGenerator.StellarType.B5V,
-            StellarTypeGenerator.StellarType.A0V => ScientificMilkyWayGenerator.StellarType.A0V,
-            StellarTypeGenerator.StellarType.A5V => ScientificMilkyWayGenerator.StellarType.A5V,
-            StellarTypeGenerator.StellarType.F0V => ScientificMilkyWayGenerator.StellarType.F0V,
-            StellarTypeGenerator.StellarType.F5V => ScientificMilkyWayGenerator.StellarType.F5V,
-            StellarTypeGenerator.StellarType.G0V => ScientificMilkyWayGenerator.StellarType.G0V,
-            StellarTypeGenerator.StellarType.G5V => ScientificMilkyWayGenerator.StellarType.G5V,
-            StellarTypeGenerator.StellarType.K0V => ScientificMilkyWayGenerator.StellarType.K0V,
-            StellarTypeGenerator.StellarType.K5V => ScientificMilkyWayGenerator.StellarType.K5V,
-            StellarTypeGenerator.StellarType.M0V => ScientificMilkyWayGenerator.StellarType.M0V,
-            StellarTypeGenerator.StellarType.M5V => ScientificMilkyWayGenerator.StellarType.M5V,
-            StellarTypeGenerator.StellarType.M8V => ScientificMilkyWayGenerator.StellarType.M8V,
+            StellarTypeGenerator.StellarType.O5V => StellarTypeGenerator.StellarType.O5V,
+            StellarTypeGenerator.StellarType.B0V => StellarTypeGenerator.StellarType.B0V,
+            StellarTypeGenerator.StellarType.B5V => StellarTypeGenerator.StellarType.B5V,
+            StellarTypeGenerator.StellarType.A0V => StellarTypeGenerator.StellarType.A0V,
+            StellarTypeGenerator.StellarType.A5V => StellarTypeGenerator.StellarType.A5V,
+            StellarTypeGenerator.StellarType.F0V => StellarTypeGenerator.StellarType.F0V,
+            StellarTypeGenerator.StellarType.F5V => StellarTypeGenerator.StellarType.F5V,
+            StellarTypeGenerator.StellarType.G0V => StellarTypeGenerator.StellarType.G0V,
+            StellarTypeGenerator.StellarType.G5V => StellarTypeGenerator.StellarType.G5V,
+            StellarTypeGenerator.StellarType.K0V => StellarTypeGenerator.StellarType.K0V,
+            StellarTypeGenerator.StellarType.K5V => StellarTypeGenerator.StellarType.K5V,
+            StellarTypeGenerator.StellarType.M0V => StellarTypeGenerator.StellarType.M0V,
+            StellarTypeGenerator.StellarType.M5V => StellarTypeGenerator.StellarType.M5V,
+            StellarTypeGenerator.StellarType.M8V => StellarTypeGenerator.StellarType.M8V,
             
             // Brown dwarfs
-            StellarTypeGenerator.StellarType.L0 => ScientificMilkyWayGenerator.StellarType.L0,
-            StellarTypeGenerator.StellarType.L5 => ScientificMilkyWayGenerator.StellarType.L5,
-            StellarTypeGenerator.StellarType.T0 => ScientificMilkyWayGenerator.StellarType.T0,
-            StellarTypeGenerator.StellarType.T5 => ScientificMilkyWayGenerator.StellarType.T5,
-            StellarTypeGenerator.StellarType.Y0 => ScientificMilkyWayGenerator.StellarType.Y0,
+            StellarTypeGenerator.StellarType.L0 => StellarTypeGenerator.StellarType.L0,
+            StellarTypeGenerator.StellarType.L5 => StellarTypeGenerator.StellarType.L5,
+            StellarTypeGenerator.StellarType.T0 => StellarTypeGenerator.StellarType.T0,
+            StellarTypeGenerator.StellarType.T5 => StellarTypeGenerator.StellarType.T5,
+            StellarTypeGenerator.StellarType.Y0 => StellarTypeGenerator.StellarType.Y0,
             
             // Giants
-            StellarTypeGenerator.StellarType.G5III => ScientificMilkyWayGenerator.StellarType.G5III,
-            StellarTypeGenerator.StellarType.K0III => ScientificMilkyWayGenerator.StellarType.K0III,
-            StellarTypeGenerator.StellarType.K5III => ScientificMilkyWayGenerator.StellarType.K5III,
-            StellarTypeGenerator.StellarType.M0III => ScientificMilkyWayGenerator.StellarType.M0III,
-            StellarTypeGenerator.StellarType.B0III => ScientificMilkyWayGenerator.StellarType.B0III,
+            StellarTypeGenerator.StellarType.G5III => StellarTypeGenerator.StellarType.G5III,
+            StellarTypeGenerator.StellarType.K0III => StellarTypeGenerator.StellarType.K0III,
+            StellarTypeGenerator.StellarType.K5III => StellarTypeGenerator.StellarType.K5III,
+            StellarTypeGenerator.StellarType.M0III => StellarTypeGenerator.StellarType.M0III,
+            StellarTypeGenerator.StellarType.B0III => StellarTypeGenerator.StellarType.B0III,
             
             // Supergiants
-            StellarTypeGenerator.StellarType.M2I => ScientificMilkyWayGenerator.StellarType.M2I,
-            StellarTypeGenerator.StellarType.B0I => ScientificMilkyWayGenerator.StellarType.B0I,
+            StellarTypeGenerator.StellarType.M2I => StellarTypeGenerator.StellarType.M2I,
+            StellarTypeGenerator.StellarType.B0I => StellarTypeGenerator.StellarType.B0I,
             
             // Compact objects
-            StellarTypeGenerator.StellarType.DA => ScientificMilkyWayGenerator.StellarType.DA,
-            StellarTypeGenerator.StellarType.NS => ScientificMilkyWayGenerator.StellarType.NS,
-            StellarTypeGenerator.StellarType.BH => ScientificMilkyWayGenerator.StellarType.BH,
-            StellarTypeGenerator.StellarType.QS => ScientificMilkyWayGenerator.StellarType.NS, // Treat as neutron star
-            StellarTypeGenerator.StellarType.SMBH => ScientificMilkyWayGenerator.StellarType.SMBH,
+            StellarTypeGenerator.StellarType.DA => StellarTypeGenerator.StellarType.DA,
+            StellarTypeGenerator.StellarType.NS => StellarTypeGenerator.StellarType.NS,
+            StellarTypeGenerator.StellarType.BH => StellarTypeGenerator.StellarType.BH,
+            StellarTypeGenerator.StellarType.QS => StellarTypeGenerator.StellarType.NS, // Treat as neutron star
+            StellarTypeGenerator.StellarType.SMBH => StellarTypeGenerator.StellarType.SMBH,
             
-            _ => ScientificMilkyWayGenerator.StellarType.G5V
+            _ => StellarTypeGenerator.StellarType.G5V
         };
+    }
+    
+    static void GenerateDensityHeatmaps()
+    {
+        Console.WriteLine("\n=== Generate Density Heatmaps ===");
+        Console.WriteLine("Create beautiful visualization of star and rogue planet density");
+        Console.WriteLine("Using pure mathematical formulas from GalaxyGenerator");
+        
+        Console.Write("\nImage size (512-4096, default 2048): ");
+        var sizeInput = Console.ReadLine();
+        int imageSize = 2048;
+        
+        if (!string.IsNullOrWhiteSpace(sizeInput) && int.TryParse(sizeInput, out var size))
+        {
+            imageSize = Math.Max(512, Math.Min(4096, size));
+        }
+        
+        Console.Write("\nVertical scale for side view (1.0-10.0, default 5.0): ");
+        var scaleInput = Console.ReadLine();
+        float verticalScale = 5.0f;
+        
+        if (!string.IsNullOrWhiteSpace(scaleInput) && float.TryParse(scaleInput, out var scale))
+        {
+            verticalScale = Math.Max(1.0f, Math.Min(10.0f, scale));
+        }
+        
+        try
+        {
+            var visualizer = new DensityVisualizer();
+            visualizer.GenerateDensityHeatmaps(imageSize, imageSize, verticalScale);
+            
+            Console.WriteLine("\n✓ Density heatmaps generated successfully!");
+            Console.WriteLine("\nGenerated files:");
+            Console.WriteLine("  - MilkyWay_DensityHeatmap_Top.png (top-down view)");
+            Console.WriteLine("  - MilkyWay_DensityHeatmap_Side.png (side view)");
+            Console.WriteLine("  - MilkyWay_DensityHeatmap_Arms.png (spiral arm enhancement)");
+            Console.WriteLine("  - MilkyWay_DensityHeatmap_Rogues.png (rogue planet density)");
+            Console.WriteLine("  - MilkyWay_DensityHeatmap_Composite.png (all views combined)");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error generating heatmaps: {ex.Message}");
+        }
     }
 }

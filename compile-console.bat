@@ -14,7 +14,6 @@ if %ERRORLEVEL% EQU 0 (
     
     REM Copy source files
     copy /Y ScientificMilkyWayConsole.cs ScientificMilkyWayConsole\Program.cs
-    copy /Y ScientificMilkyWayGenerator.cs ScientificMilkyWayConsole\
     copy /Y GalacticAnalytics.cs ScientificMilkyWayConsole\
     copy /Y ChunkBasedGalaxySystem.cs ScientificMilkyWayConsole\
     copy /Y UnifiedSystemGenerator.cs ScientificMilkyWayConsole\
@@ -44,7 +43,7 @@ REM Try .NET Framework csc
 set "DOTNET_PATH=%WINDIR%\Microsoft.NET\Framework64\v4.0.30319"
 if exist "%DOTNET_PATH%\csc.exe" (
     echo Using .NET Framework compiler...
-    "%DOTNET_PATH%\csc.exe" /out:ScientificMilkyWayConsole.exe ScientificMilkyWayConsole.cs ScientificMilkyWayGenerator.cs GalacticAnalytics.cs ChunkBasedGalaxySystem.cs UnifiedSystemGenerator.cs GalaxyGenerator.cs RoguePlanet.cs ScientificGalaxyVisualizer2.cs ChunkVisualizer.cs StellarTypeGenerator.cs Star.cs
+    "%DOTNET_PATH%\csc.exe" /out:ScientificMilkyWayConsole.exe ScientificMilkyWayConsole.cs GalacticAnalytics.cs ChunkBasedGalaxySystem.cs UnifiedSystemGenerator.cs GalaxyGenerator.cs RoguePlanet.cs ChunkVisualizer.cs StellarTypeGenerator.cs Star.cs
     echo.
     echo Build complete! Run with: ScientificMilkyWayConsole.exe
     goto end
