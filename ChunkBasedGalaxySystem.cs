@@ -14,6 +14,8 @@ public class ChunkBasedGalaxySystem
     private const int MAX_RADIUS_CHUNKS = 1500; // 0-1499 (150,000 ly) - extended for halo
     private const int MAX_ANGULAR_CHUNKS = 360; // 0-359 degrees
     private const int MAX_Z_CHUNKS = 201; // -100 to 100 (-10000 to 10000 ly) - extended for halo
+    private const double SOL_EXCLUSION_RADIUS = 80.0;    // ly
+
     
     // Real stellar data
     private RealStellarData? realStellarData;
@@ -25,6 +27,17 @@ public class ChunkBasedGalaxySystem
     /// </summary>
     public RealStellarData? GetRealStellarData() => realStellarData;
     
+    // splitmix64 generator for one-off 64-bit samples
+    private static ulong SplitMix64(ref ulong state)
+    {
+        state += 0x9E3779B97F4A7C15UL;
+        ulong z = state;
+        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
+        z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
+        return z ^ (z >> 31);
+    }
+
+    
     /// <summary>
     /// Initialize the galaxy system with optional real stellar data
     /// </summary>
@@ -35,7 +48,7 @@ public class ChunkBasedGalaxySystem
             realStellarData = new RealStellarData();
             // Try to load from files first, fall back to default data
             string dataPath = "stellar_data";
-            
+
             // Try multiple possible paths
             string[] possiblePaths = {
                 dataPath,
@@ -44,7 +57,7 @@ public class ChunkBasedGalaxySystem
                 Path.Combine("ScientificMilkyWayVisual", dataPath),
                 Path.GetFullPath(dataPath)
             };
-            
+
             bool loaded = false;
             foreach (var path in possiblePaths)
             {
@@ -60,7 +73,7 @@ public class ChunkBasedGalaxySystem
                     break;
                 }
             }
-            
+
             if (!loaded)
             {
                 Console.WriteLine("Stellar data directory not found. No real stars will be loaded.");
@@ -486,45 +499,20 @@ public class ChunkBasedGalaxySystem
         // If star index exceeds expected stars, it doesn't exist
         if (starIndex >= expectedStars)
         {
-            throw new ArgumentException($"Star index {starIndex} exceeds expected stars ({expectedStars}) in chunk {chunk}");
+            return null;
         }
         
-        // Generate deterministic position within chunk using a better PRNG
-        // Mix the seed thoroughly using MurmurHash3-like operations
-        ulong h = (ulong)seed;
-        h ^= h >> 33;
-        h *= 0xff51afd7ed558ccdUL;
-        h ^= h >> 33;
-        h *= 0xc4ceb9fe1a85ec53UL;
-        h ^= h >> 33;
-        
-        // Generate three different values from the hash
-        // Using Philox-style counter-based RNG for better distribution
-        ulong counter = (ulong)starIndex;
-        ulong key = h;
-        
-        // Round 1
-        ulong mul1 = counter * 0xD2511F53CD5B4959UL;
-        ulong mul2 = key * 0x9E3779B97F4A7C15UL;
-        ulong x1 = mul1 ^ key;
-        ulong x2 = mul2 ^ counter;
-        
-        // Round 2  
-        mul1 = x1 * 0xD2511F53CD5B4959UL;
-        mul2 = x2 * 0x9E3779B97F4A7C15UL;
-        x1 = mul1 ^ x2;
-        x2 = mul2 ^ mul1;
-        
-        // Convert to doubles in [0,1) range
-        double u1 = (x1 >> 11) * (1.0 / (1UL << 53));
-        double u2 = (x2 >> 11) * (1.0 / (1UL << 53));
-        double u3 = ((x1 ^ x2) >> 11) * (1.0 / (1UL << 53));
-        
-        // Pure random distribution within chunk bounds
-        double r = bounds.rMin + u1 * (bounds.rMax - bounds.rMin);
+                // replace whatever x1/x2 rounds you had with:
+        ulong smState = (ulong)seed;
+        double u1 = (SplitMix64(ref smState) >> 11) * (1.0 / (1UL << 53));
+        double u2 = (SplitMix64(ref smState) >> 11) * (1.0 / (1UL << 53));
+        double u3 = (SplitMix64(ref smState) >> 11) * (1.0 / (1UL << 53));
+
+        // then map into chunk bounds as before:
+        double r     = bounds.rMin     + u1 * (bounds.rMax - bounds.rMin);
         double theta = bounds.thetaMin + u2 * (bounds.thetaMax - bounds.thetaMin);
-        double z = bounds.zMin + u3 * (bounds.zMax - bounds.zMin);
-        
+        double z     = bounds.zMin     + u3 * (bounds.zMax - bounds.zMin);
+
         // Convert to Cartesian
         float x = (float)(r * Math.Cos(theta));
         float y = (float)(r * Math.Sin(theta));
@@ -534,7 +522,6 @@ public class ChunkBasedGalaxySystem
         const float SOL_R = 26550f;
         const float SOL_THETA_DEG = 0.5f;
         const float SOL_Z = 0f;
-        const float SUPPRESSION_RADIUS = 80f;
         
         // Calculate Sol's position in Cartesian coordinates
         float solTheta = SOL_THETA_DEG * (float)Math.PI / 180f;
@@ -545,13 +532,6 @@ public class ChunkBasedGalaxySystem
         float dy = position.Y - solY;
         float dz = position.Z - SOL_Z;
         float distanceFromSol = (float)Math.Sqrt(dx * dx + dy * dy + dz * dz);
-        
-        if (distanceFromSol <= SUPPRESSION_RADIUS)
-        {
-            // All procedural stars within the suppression bubble are suppressed
-            // Real stars can only be accessed through their special seeds
-            throw new ArgumentException($"Star at position ({position.X:F1}, {position.Y:F1}, {position.Z:F1}) is within {SUPPRESSION_RADIUS} ly of Sol and has been suppressed for real stellar data");
-        }
         
         // Generate star using unified system
         var star = Star.GenerateAtPosition(position, seed);
@@ -651,50 +631,96 @@ public class ChunkBasedGalaxySystem
     /// Generate all stars in a chunk - SUPER FAST!
     /// </summary>
     public List<Star> GenerateChunkStars(string chunkId)
+{
+    var chunk  = new ChunkCoordinate(chunkId);
+    var bounds = chunk.GetBounds();
+
+    // how many procedural stars we want in this chunk
+    int needed = CalculateExpectedStars(chunk);
+
+    // output list starts with capacity for procedurals + specials + reals
+    var stars = new List<Star>(needed);
+
+    // 1) add any fixed special objects (Sgr A*, etc.)
+    var specialObjects = GalacticAnalytics.GetSpecialObjectsInChunk(
+        bounds.rMin, bounds.rMax,
+        bounds.thetaMin, bounds.thetaMax,
+        bounds.zMin, bounds.zMax);
+    stars.AddRange(specialObjects);
+
+    // 2) load the real catalog stars
+    var realStars = new List<Star>();
+    GenerateRealStarsInChunk(chunk, ref realStars);
+    stars.AddRange(realStars);
+
+    // 2a) build a spatial hash grid for fast exclusion tests
+    const float EXCLUSION_RADIUS = 3f;
+    const float CELL_SIZE       = EXCLUSION_RADIUS;
+    var grid = new Dictionary<(int, int, int), List<Star>>();
+    foreach (var real in realStars)
     {
-        var chunk = new ChunkCoordinate(chunkId);
-        var stars = new List<Star>();
-        
-        // First add special objects (like Sgr A*)
-        var bounds = chunk.GetBounds();
-        var specialObjects = GalacticAnalytics.GetSpecialObjectsInChunk(
-            bounds.rMin, bounds.rMax, bounds.thetaMin, bounds.thetaMax, bounds.zMin, bounds.zMax);
-        stars.AddRange(specialObjects);
-        
-        // Real stars will be added later through GenerateRealStarsInChunk
-        // This prevents duplication
-        
-        // Calculate expected stars
-        int expectedStars = CalculateExpectedStars(chunk);
-        
-        // Generate all stars in chunk - just iterate through indices!
-        for (int i = 0; i < expectedStars; i++)
+        var p = real.Position;
+        var key = (
+            x: (int)Math.Floor(p.X / CELL_SIZE),
+            y: (int)Math.Floor(p.Y / CELL_SIZE),
+            z: (int)Math.Floor(p.Z / CELL_SIZE)
+        );
+        if (!grid.TryGetValue(key, out var bucket))
+            grid[key] = bucket = new List<Star>();
+        bucket.Add(real);
+    }
+
+    // 3) generate procedurals until we have 'needed', skipping any within 3 ly of a real
+    var procStars = new List<Star>(needed);
+    ulong counter = 0;
+    while (procStars.Count < needed)
+    {
+        long seed = EncodeSeed(chunk.R, chunk.Theta, chunk.Z, (int)counter++);
+        Star s = GetStarBySeed(seed);
+        if (s == null)
+            continue;
+
+        // locate cell of this star
+        var cx = (int)Math.Floor(s.Position.X / CELL_SIZE);
+        var cy = (int)Math.Floor(s.Position.Y / CELL_SIZE);
+        var cz = (int)Math.Floor(s.Position.Z / CELL_SIZE);
+
+        bool tooClose = false;
+        // only check this cell and its 26 neighbors
+        for (int dx = -1; dx <= 1 && !tooClose; dx++)
+        for (int dy = -1; dy <= 1 && !tooClose; dy++)
+        for (int dz = -1; dz <= 1 && !tooClose; dz++)
         {
-            long seed = EncodeSeed(chunk.R, chunk.Theta, chunk.Z, i);
-            try
+            var key = (cx + dx, cy + dy, cz + dz);
+            if (!grid.TryGetValue(key, out var bucket))
+                continue;
+            foreach (var real in bucket)
             {
-                var star = GetStarBySeed(seed);
-                stars.Add(star);
-            }
-            catch (ArgumentException ex)
-            {
-                // Skip suppressed stars within Sol bubble
-                if (ex.Message.Contains("suppressed for real stellar data"))
+                float ddx = s.Position.X - real.Position.X;
+                float ddy = s.Position.Y - real.Position.Y;
+                float ddz = s.Position.Z - real.Position.Z;
+                if (ddx*ddx + ddy*ddy + ddz*ddz <= EXCLUSION_RADIUS * EXCLUSION_RADIUS)
                 {
-                    continue;
-                }
-                else
-                {
-                    throw; // Re-throw other exceptions
+                    tooClose = true;
+                    break;
                 }
             }
         }
-        
-        // Add real stars if in Sol bubble
-        GenerateRealStarsInChunk(chunk, ref stars);
-        
-        return stars;
+        if (tooClose)
+            continue;
+
+        procStars.Add(s);
     }
+
+    // 4) merge procedurals into the final list
+    stars.AddRange(procStars);
+    return stars;
+}
+
+
+
+
+
     
     /// <summary>
     /// Generate all objects in a chunk (stars and optionally rogue planets)
@@ -809,10 +835,9 @@ public class ChunkBasedGalaxySystem
         }
         
         // Fill gaps with procedural stars if we're in the Sol bubble but have too few stars
-        if (suppressedCount > 0 && stars.Count < expectedStars * 0.5) // If we have less than 50% of expected stars
+        if (suppressedCount > 0) // If we have less than 50% of expected stars
         {
             Console.WriteLine($"Filling gaps: have {stars.Count} stars, expected ~{expectedStars}");
-            FillGapsWithProceduralStars(chunk, ref stars, expectedStars - stars.Count);
         }
         
         Console.WriteLine($"Stars in chunk: {stars.Count} (generated in {elapsed:F2}s)");
@@ -1163,8 +1188,7 @@ public class ChunkBasedGalaxySystem
         // Check if this chunk could contain the Sol bubble
         const float SOL_R = 26550f;
         const float SOL_THETA_DEG = 0.5f;
-        const float SOL_Z = 0f;
-        const float SUPPRESSION_RADIUS = 80f;
+        const float SOL_Z = 0f; 
         
         float solTheta = SOL_THETA_DEG * (float)Math.PI / 180f;
         float solX = SOL_R * (float)Math.Cos(solTheta);
@@ -1177,7 +1201,6 @@ public class ChunkBasedGalaxySystem
         
         // Only process chunks that overlap with the Sol bubble
         // The chunk diagonal is about 100 ly, so check if any part of chunk could overlap
-        if (distanceFromSol > SUPPRESSION_RADIUS + 100) return;
         
         // Get all real stars in this chunk's bounds
         var realStarsInBounds = realStellarData.GetAllStars().Where(rs =>
@@ -1224,80 +1247,4 @@ public class ChunkBasedGalaxySystem
     /// <summary>
     /// Fill gaps between real stars with procedural stars
     /// </summary>
-    private void FillGapsWithProceduralStars(ChunkCoordinate chunk, ref List<Star> stars, int targetCount)
-    {
-        const float MIN_SEPARATION = 3.0f; // Minimum distance from any real star
-        var bounds = chunk.GetBounds();
-        var rng = new Random(chunk.GetHashCode());
-        int added = 0;
-        int attempts = 0;
-        int maxAttempts = targetCount * 10; // Don't try forever
-        
-        // Get all star positions for distance checking
-        var starPositions = stars.Select(s => s.Position).ToList();
-        
-        while (added < targetCount && attempts < maxAttempts)
-        {
-            attempts++;
-            
-            // Generate random position within chunk bounds
-            double r = bounds.rMin + (bounds.rMax - bounds.rMin) * rng.NextDouble();
-            double theta = bounds.thetaMin + (bounds.thetaMax - bounds.thetaMin) * rng.NextDouble();
-            double z = bounds.zMin + (bounds.zMax - bounds.zMin) * rng.NextDouble();
-            
-            // Convert to Cartesian
-            float x = (float)(r * Math.Cos(theta));
-            float y = (float)(r * Math.Sin(theta));
-            float posZ = (float)z;
-            
-            var position = new GalaxyGenerator.Vector3(x, y, posZ);
-            
-            // Check distance from Sol
-            const float SOL_R = 26550f;
-            const float SOL_THETA_DEG = 0.5f;
-            float solTheta = SOL_THETA_DEG * (float)Math.PI / 180f;
-            float solX = SOL_R * (float)Math.Cos(solTheta);
-            float solY = SOL_R * (float)Math.Sin(solTheta);
-            
-            float dx = position.X - solX;
-            float dy = position.Y - solY;
-            float dz = position.Z;
-            float distFromSol = (float)Math.Sqrt(dx * dx + dy * dy + dz * dz);
-            
-            // Only add if within Sol bubble
-            if (distFromSol > 80f) continue;
-            
-            // Check distance from all existing stars
-            bool tooClose = false;
-            foreach (var starPos in starPositions)
-            {
-                float sdx = position.X - starPos.X;
-                float sdy = position.Y - starPos.Y;
-                float sdz = position.Z - starPos.Z;
-                float dist = (float)Math.Sqrt(sdx * sdx + sdy * sdy + sdz * sdz);
-                
-                if (dist < MIN_SEPARATION)
-                {
-                    tooClose = true;
-                    break;
-                }
-            }
-            
-            if (!tooClose)
-            {
-                // Generate a procedural star at this position
-                long seed = chunk.GetHashCode() * 1000000L + added + 900000000L; // Special seed range for gap-fill stars
-                var star = Star.GenerateAtPosition(position, seed);
-                star.SystemName = $"Gapfill-{chunk}-{added}";
-                stars.Add(star);
-                starPositions.Add(position);
-                added++;
-            }
-        }
-        
-        if (added > 0)
-        {
-            Console.WriteLine($"Added {added} procedural gap-fill stars (tried {attempts} positions)");
-        }
-    }
 }
