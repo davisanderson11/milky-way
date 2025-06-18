@@ -26,18 +26,120 @@ public class DensityVisualizer
         GenerateDensityHeatmapComposite(width * 2, height * 2, verticalScale);
     }
     
+    /// <summary>
+/// Generate heatmaps of the *absolute* stellar density
+/// (stars per ly³), as returned by ConvertToStellarDensity.
+/// </summary>
+public void GenerateStellarDensityHeatmaps(int width, int height, float verticalScale = 5.0f)
+{
+    Console.WriteLine($"\nGenerating *stellar* density heatmaps (vertical scale: {verticalScale}x)...");
+    GenerateStellarDensityHeatmapTopView(width, height);
+    GenerateStellarDensityHeatmapSideView(width, height, verticalScale);
+    GenerateStellarDensityHeatmapComposite(width * 2, height * 2, verticalScale);
+}
+
+private void GenerateStellarDensityHeatmapTopView(int width, int height)
+{
+    Console.WriteLine("  Top-down stellar-density heatmap...");
+    using var surface = SKSurface.Create(new SKImageInfo(width, height));
+    var canvas = surface.Canvas;
+    canvas.Clear(SKColors.Black);
+    var scale = 160000.0f / Math.Min(width, height); // 60 kly radius
+
+    using var paint = new SKPaint();
+    for (int y = 0; y < height; y++)
+    {
+        for (int x = 0; x < width; x++)
+        {
+            var galX = (x - width / 2f) * scale;
+            var galY = (height / 2f - y) * scale;
+            var pos  = new GalaxyGenerator.Vector3(galX, galY, 0);
+            // ← swap in absolute density:
+            var density = GalaxyGenerator.GetExpectedStarDensity(pos);
+            // log-scale for visibility:
+            var logDensity = (float)(Math.Log10(density + 1e-6) + 6) / 6f;
+            logDensity = Math.Max(0, Math.Min(1, logDensity));
+            paint.Color = GetHeatmapColor(logDensity);
+            canvas.DrawPoint(x, y, paint);
+        }
+    }
+
+    DrawHeatmapInfo(canvas, "Stellar Density Heatmap – Top View [Log Scale]", width, height);
+    SaveImage(surface, "MilkyWay_StellarDensity_Top.png");
+}
+
+private void GenerateStellarDensityHeatmapSideView(int width, int height, float verticalScale = 1.0f)
+{
+    Console.WriteLine("  Side-view stellar-density heatmap...");
+    using var surface = SKSurface.Create(new SKImageInfo(width, height));
+    var canvas = surface.Canvas;
+    canvas.Clear(SKColors.Black);
+    var scaleX = 120000.0f / width;
+    var zRange = 120000.0f * verticalScale;
+    var scaleZ = zRange / height;
+
+    using var paint = new SKPaint();
+    for (int y = 0; y < height; y += 2)
+    {
+        for (int x = 0; x < width; x += 2)
+        {
+            var galX = (x - width/2f) * scaleX;
+            var galZ = (height/2f - y) * scaleZ;
+            var pos  = new GalaxyGenerator.Vector3(galX, 0, galZ);
+            var density = GalaxyGenerator.GetExpectedStarDensity(pos);
+            var logDensity = (float)(Math.Log10(density + 1e-6) + 6) / 6f;
+            logDensity = Math.Max(0, Math.Min(1, logDensity));
+            paint.Color = GetHeatmapColor(logDensity);
+            canvas.DrawRect(x, y, 2, 2, paint);
+        }
+    }
+
+    DrawHeatmapInfo(canvas, 
+        $"Stellar Density Heatmap – Side View (Y=0) [Log Scale]", 
+        width, height);
+    DrawDistanceRulers(canvas, width, height, scaleX, scaleZ, "side", verticalScale);
+    SaveImage(surface, "MilkyWay_StellarDensity_Side.png");
+}
+
+private void GenerateStellarDensityHeatmapComposite(int width, int height, float verticalScale = 1.0f)
+{
+    Console.WriteLine("  Composite stellar-density heatmap...");
+    using var surface = SKSurface.Create(new SKImageInfo(width, height));
+    var canvas = surface.Canvas;
+    canvas.Clear(SKColors.Black);
+
+    int subW = width/2, subH = height/2;
+
+    // Top-left: top view
+    canvas.Save();
+    canvas.ClipRect(SKRect.Create(0, 0, subW, subH));
+    GenerateStellarDensityHeatmapTopView(subW, subH);
+    canvas.Restore();
+
+    // Top-right: side view
+    canvas.Save();
+        canvas.ClipRect(SKRect.Create(subW, 0, subW, subH));
+    canvas.Translate(subW, 0);
+    GenerateStellarDensityHeatmapSideView(subW, subH, verticalScale);
+    canvas.Restore();
+
+    // (You can add additional panels here if desired…)
+
+    SaveImage(surface, "MilkyWay_StellarDensity_Composite.png");
+}
+    
     private void GenerateDensityHeatmapTopView(int width, int height)
     {
         Console.WriteLine("Generating top-down density heatmap...");
-        
+
         using (var surface = SKSurface.Create(new SKImageInfo(width, height)))
         {
             var canvas = surface.Canvas;
             canvas.Clear(SKColors.Black);
-            
+
             // Calculate density at each pixel
             var scale = 120000.0f / Math.Min(width, height); // 60k ly radius
-            
+
             using (var paint = new SKPaint())
             {
                 for (int y = 0; y < height; y++)
@@ -47,31 +149,31 @@ public class DensityVisualizer
                         // Convert pixel to galaxy coordinates
                         var galX = (x - width / 2f) * scale;
                         var galY = (height / 2f - y) * scale; // Flip Y
-                        
+
                         // Calculate density at this point (z=0 for top view)
                         var pos = new GalaxyGenerator.Vector3(galX, galY, 0);
                         var density = GalaxyGenerator.CalculateTotalDensity(pos);
-                        
+
                         // Apply logarithmic scaling to see full structure
                         // log10(density + 0.001) maps [0,1] to roughly [-3, 0]
                         // Then normalize to [0,1] range
                         var logDensity = (float)(Math.Log10(density + 0.001) + 3) / 3f;
                         logDensity = Math.Max(0, Math.Min(1, logDensity));
-                        
+
                         // Convert density to color using a heat color map
                         var color = GetHeatmapColor(logDensity);
                         paint.Color = color;
                         canvas.DrawPoint(x, y, paint);
                     }
-                    
+
                     // Progress update
                     if (y % 100 == 0)
                     {
-                        Console.WriteLine($"  Progress: {(float)y/height*100:F1}%");
+                        Console.WriteLine($"  Progress: {(float)y / height * 100:F1}%");
                     }
                 }
             }
-            
+
             // Add labels and scale
             DrawHeatmapInfo(canvas, "Density Heatmap - Top View (Z=0) [Log Scale]", width, height);
             SaveImage(surface, "MilkyWay_DensityHeatmap_Top.png");

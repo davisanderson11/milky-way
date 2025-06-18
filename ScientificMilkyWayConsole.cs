@@ -488,6 +488,7 @@ public class ScientificMilkyWayConsole
         {
             var visualizer = new DensityVisualizer();
             visualizer.GenerateDensityHeatmaps(imageSize, imageSize, verticalScale);
+            visualizer.GenerateStellarDensityHeatmaps(imageSize, imageSize, verticalScale);
             
             Console.WriteLine("\n✓ Density heatmaps generated successfully!");
             Console.WriteLine("\nGenerated files:");
