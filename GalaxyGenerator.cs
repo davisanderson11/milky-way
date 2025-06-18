@@ -96,27 +96,6 @@ public static class GalaxyGenerator
     }
     
     /// <summary>
-    /// Generate a deterministic seed based on a 3D position.
-    /// This ensures that the same position always generates the same star.
-    /// </summary>
-    public static long GenerateSeedFromPosition(Vector3 position)
-    {
-        // Quantize position to ensure consistency (1/10 light year precision)
-        long xPart = (long)Math.Round(position.X * 10);
-        long yPart = (long)Math.Round(position.Y * 10);
-        long zPart = (long)Math.Round(position.Z * 10);
-        
-        // Use a hash-like combination to create unique seeds
-        // This avoids patterns while maintaining determinism
-        long seed = xPart * 73856093L ^ yPart * 19349663L ^ zPart * 83492791L;
-        
-        // Ensure positive - use bitwise AND to keep lower 63 bits
-        seed = seed & 0x7FFFFFFFFFFFFFFF;
-        
-        return seed;
-    }
-    
-    /// <summary>
     /// Calculate the total stellar density at a given position.
     /// This is the master density function that defines the galaxy's shape.
     /// </summary>
@@ -596,42 +575,6 @@ public static class GalaxyGenerator
     {
         var density = CalculateTotalDensity(position);
         return rng.NextDouble() < density * threshold;
-    }
-    
-    /// <summary>
-    /// Generate positions within a region using rejection sampling
-    /// </summary>
-    public static List<Vector3> GenerateStarPositionsInRegion(Vector3 minBounds, Vector3 maxBounds, int targetCount, int seed)
-    {
-        var positions = new List<Vector3>();
-        var rng = new Random(seed);
-        
-        // Calculate volume for density estimation
-        var volume = (maxBounds.X - minBounds.X) * (maxBounds.Y - minBounds.Y) * (maxBounds.Z - minBounds.Z);
-        
-        // Use rejection sampling
-        int attempts = 0;
-        int maxAttempts = targetCount * 100; // Prevent infinite loops
-        
-        while (positions.Count < targetCount && attempts < maxAttempts)
-        {
-            // Generate random position in bounds
-            var x = minBounds.X + (float)rng.NextDouble() * (maxBounds.X - minBounds.X);
-            var y = minBounds.Y + (float)rng.NextDouble() * (maxBounds.Y - minBounds.Y);
-            var z = minBounds.Z + (float)rng.NextDouble() * (maxBounds.Z - minBounds.Z);
-            
-            var position = new Vector3(x, y, z);
-            
-            // Accept/reject based on density
-            if (ShouldHaveStar(position, rng))
-            {
-                positions.Add(position);
-            }
-            
-            attempts++;
-        }
-        
-        return positions;
     }
     
     private static float NormalizeAngle(float angle)

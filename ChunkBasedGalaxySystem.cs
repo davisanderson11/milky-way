@@ -532,6 +532,11 @@ public class ChunkBasedGalaxySystem
         float dy = position.Y - solY;
         float dz = position.Z - SOL_Z;
         float distanceFromSol = (float)Math.Sqrt(dx * dx + dy * dy + dz * dz);
+
+            // exclude any procedurals within 80 ly of Sol
+        if (distanceFromSol <= SOL_EXCLUSION_RADIUS)
+            return null;
+
         
         // Generate star using unified system
         var star = Star.GenerateAtPosition(position, seed);
@@ -632,93 +637,34 @@ public class ChunkBasedGalaxySystem
     /// </summary>
     public List<Star> GenerateChunkStars(string chunkId)
 {
-    var chunk  = new ChunkCoordinate(chunkId);
+    var chunk = new ChunkCoordinate(chunkId);
+    int expectedStars = CalculateExpectedStars(chunk);
+    var stars = new List<Star>(expectedStars);
+
+    // 1) Any fixed special objects (Sgr A*, etc.)
     var bounds = chunk.GetBounds();
+    var special = GalacticAnalytics
+        .GetSpecialObjectsInChunk(
+            bounds.rMin, bounds.rMax,
+            bounds.thetaMin, bounds.thetaMax,
+            bounds.zMin, bounds.zMax);
+    stars.AddRange(special);
 
-    // how many procedural stars we want in this chunk
-    int needed = CalculateExpectedStars(chunk);
-
-    // output list starts with capacity for procedurals + specials + reals
-    var stars = new List<Star>(needed);
-
-    // 1) add any fixed special objects (Sgr A*, etc.)
-    var specialObjects = GalacticAnalytics.GetSpecialObjectsInChunk(
-        bounds.rMin, bounds.rMax,
-        bounds.thetaMin, bounds.thetaMax,
-        bounds.zMin, bounds.zMax);
-    stars.AddRange(specialObjects);
-
-    // 2) load the real catalog stars
-    var realStars = new List<Star>();
-    GenerateRealStarsInChunk(chunk, ref realStars);
-    stars.AddRange(realStars);
-
-    // 2a) build a spatial hash grid for fast exclusion tests
-    const float EXCLUSION_RADIUS = 3f;
-    const float CELL_SIZE       = EXCLUSION_RADIUS;
-    var grid = new Dictionary<(int, int, int), List<Star>>();
-    foreach (var real in realStars)
+    // 2) Procedural stars, exactly expectedStars attempts, skipping nulls
+    for (int i = 0; i < expectedStars; i++)
     {
-        var p = real.Position;
-        var key = (
-            x: (int)Math.Floor(p.X / CELL_SIZE),
-            y: (int)Math.Floor(p.Y / CELL_SIZE),
-            z: (int)Math.Floor(p.Z / CELL_SIZE)
-        );
-        if (!grid.TryGetValue(key, out var bucket))
-            grid[key] = bucket = new List<Star>();
-        bucket.Add(real);
-    }
-
-    // 3) generate procedurals until we have 'needed', skipping any within 3 ly of a real
-    var procStars = new List<Star>(needed);
-    ulong counter = 0;
-    while (procStars.Count < needed)
-    {
-        long seed = EncodeSeed(chunk.R, chunk.Theta, chunk.Z, (int)counter++);
+        long seed = EncodeSeed(chunk.R, chunk.Theta, chunk.Z, i);
         Star s = GetStarBySeed(seed);
-        if (s == null)
-            continue;
-
-        // locate cell of this star
-        var cx = (int)Math.Floor(s.Position.X / CELL_SIZE);
-        var cy = (int)Math.Floor(s.Position.Y / CELL_SIZE);
-        var cz = (int)Math.Floor(s.Position.Z / CELL_SIZE);
-
-        bool tooClose = false;
-        // only check this cell and its 26 neighbors
-        for (int dx = -1; dx <= 1 && !tooClose; dx++)
-        for (int dy = -1; dy <= 1 && !tooClose; dy++)
-        for (int dz = -1; dz <= 1 && !tooClose; dz++)
-        {
-            var key = (cx + dx, cy + dy, cz + dz);
-            if (!grid.TryGetValue(key, out var bucket))
-                continue;
-            foreach (var real in bucket)
-            {
-                float ddx = s.Position.X - real.Position.X;
-                float ddy = s.Position.Y - real.Position.Y;
-                float ddz = s.Position.Z - real.Position.Z;
-                if (ddx*ddx + ddy*ddy + ddz*ddz <= EXCLUSION_RADIUS * EXCLUSION_RADIUS)
-                {
-                    tooClose = true;
-                    break;
-                }
-            }
-        }
-        if (tooClose)
-            continue;
-
-        procStars.Add(s);
+        if (s != null)
+            stars.Add(s);
+        // else it was inside 80 ly of Sol, so we skip it
     }
 
-    // 4) merge procedurals into the final list
-    stars.AddRange(procStars);
+    // 3) Now tack on your real‐data stars (fills the 80 ly bubble)
+    GenerateRealStarsInChunk(chunk, ref stars);
+
     return stars;
 }
-
-
-
 
 
     
