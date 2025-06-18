@@ -65,6 +65,8 @@ public class ScientificMilkyWayConsole
         Console.WriteLine("  1. Star seed (e.g., 12345678)");
         Console.WriteLine("  2. Chunk coordinates: r_theta_z_index (e.g., 260_45_0_100)");
         Console.WriteLine("  3. Star system object: SEED-SUFFIX (e.g., 12345678-A, 12345678-1, 12345678-1-a)");
+        Console.WriteLine("  4. Real star name (e.g., 'Sol', 'Proxima Centauri', 'Sirius')");
+        Console.WriteLine("  5. 'list real' to see all real stars");
         Console.WriteLine("\nSuffix format:");
         Console.WriteLine("  Stars: A, B, C, D (uppercase letters)");
         Console.WriteLine("  Planets: 1, 2, 3... (numbers)");
@@ -85,14 +87,35 @@ public class ScientificMilkyWayConsole
             
             if (input?.ToLower() == "q") break;
             
+            if (input?.ToLower() == "list real")
+            {
+                chunkSystem.ListRealStars();
+                continue;
+            }
+            
             try
             {
                 Star star;
                 long starSeed = 0;
                 string? suffix = null;
                 
+                // First check if it's a real star name (doesn't contain _ or only digits)
+                if (input != null && !input.Contains('_') && !long.TryParse(input.Split('-')[0], out _) && !input.Contains('-'))
+                {
+                    var realStarSeed = chunkSystem.GetRealStarSeedByName(input);
+                    if (realStarSeed.HasValue)
+                    {
+                        starSeed = realStarSeed.Value;
+                        Console.WriteLine($"Found real star '{input}' with seed: {starSeed}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Real star '{input}' not found. Try 'list real' to see available stars.");
+                        continue;
+                    }
+                }
                 // Check if it's SEED-SUFFIX format (e.g., 12345678-A-1-a)
-                if (input != null && input.Contains('-') && !input.Contains('_'))
+                else if (input != null && input.Contains('-') && !input.Contains('_'))
                 {
                     var dashIndex = input.IndexOf('-');
                     var seedPart = input.Substring(0, dashIndex);
@@ -182,9 +205,21 @@ public class ScientificMilkyWayConsole
                 // Get the star
                 star = chunkSystem.GetStarBySeed(starSeed);
                 
-                // Generate the unified system once
-                var system = unifiedGen.GenerateSystem(star.Seed, ConvertToScientificType(star.Type), star.Mass, 
-                    star.Temperature, star.Luminosity);
+                // Generate the unified system
+                UnifiedSystemGenerator.StarSystem system;
+                
+                // Check if this is a real star with real data
+                if (star.IsRealStar && star.RealStarData != null)
+                {
+                    // Convert real star data to unified system
+                    system = ConvertRealStarToSystem(star, unifiedGen);
+                }
+                else
+                {
+                    // Generate procedural system
+                    system = unifiedGen.GenerateSystem(star.Seed, ConvertToScientificType(star.Type), star.Mass, 
+                        star.Temperature, star.Luminosity);
+                }
                 
                 // If no suffix provided, show the star and its system
                 if (string.IsNullOrEmpty(suffix))
@@ -466,5 +501,203 @@ public class ScientificMilkyWayConsole
         {
             Console.WriteLine($"Error generating heatmaps: {ex.Message}");
         }
+    }
+    
+    /// <summary>
+    /// Convert real star data to unified system format
+    /// </summary>
+    static UnifiedSystemGenerator.StarSystem ConvertRealStarToSystem(Star star, UnifiedSystemGenerator unifiedGen)
+    {
+        var realData = star.RealStarData!;
+        
+        // Create primary star
+        var primaryStar = new UnifiedSystemGenerator.Star
+        {
+            Id = "A",
+            Name = realData.SystemName.EndsWith(" A") ? realData.SystemName : $"{realData.SystemName} A",
+            Type = UnifiedSystemGenerator.ObjectType.Star,
+            Mass = star.Mass,
+            StellarType = ConvertToScientificType(star.Type),
+            Temperature = star.Temperature,
+            Luminosity = star.Luminosity,
+            Relationship = UnifiedSystemGenerator.StarRelationship.Primary
+        };
+        
+        // Create the system
+        var system = new UnifiedSystemGenerator.StarSystem
+        {
+            Seed = star.Seed,
+            PrimaryStar = primaryStar
+        };
+        system.AllStars.Add(primaryStar);
+        
+        // Add companion stars
+        int compIndex = 1;
+        foreach (var companion in realData.CompanionStars)
+        {
+            var compId = ((char)('A' + compIndex)).ToString();
+            var compStar = new UnifiedSystemGenerator.Star
+            {
+                Id = compId,
+                Name = companion.SystemName,
+                Type = UnifiedSystemGenerator.ObjectType.Star,
+                Mass = (float)companion.Mass,
+                StellarType = ConvertToScientificType(RealStellarData.ConvertSpectralType(companion.Type)),
+                Temperature = (float)companion.Temperature,
+                Luminosity = (float)companion.Luminosity,
+                Relationship = UnifiedSystemGenerator.StarRelationship.Binary,
+                Parent = primaryStar,
+                OrbitalDistance = 0.1 * (compIndex + 1) // Approximate orbital distance
+            };
+            
+            // For binary companions, set as BinaryCompanion instead of adding to children
+            if (compIndex == 1 && realData.CompanionStars.Count == 1)
+            {
+                primaryStar.BinaryCompanion = compStar;
+            }
+            else
+            {
+                // Multiple companions are satellites
+                compStar.Relationship = UnifiedSystemGenerator.StarRelationship.Satellite;
+            }
+            
+            system.AllStars.Add(compStar);
+            compIndex++;
+        }
+        
+        // Check if we have real planet data
+        if (realData.Planets.Count > 0)
+        {
+            // Add real planets to PRIMARY star
+            int planetIndex = 1;
+            foreach (var planet in realData.Planets)
+            {
+                var planetObj = new UnifiedSystemGenerator.Planet
+                {
+                    Id = planetIndex.ToString(),
+                    Name = planet.Name,
+                    Type = UnifiedSystemGenerator.ObjectType.Planet,
+                    Mass = (float)planet.Mass * (planet.MassUnit == "Jupiter" ? 317.8f : 1.0f), // Convert to Earth masses
+                    Radius = (float)planet.Radius * (planet.RadiusUnit == "Jupiter" ? 11.21f : 1.0f), // Convert to Earth radii
+                    Parent = primaryStar,
+                    OrbitalDistance = planet.SemiMajorAxis,
+                    OrbitalPeriod = planet.OrbitalPeriod, // Already in days
+                    PlanetType = ConvertPlanetType(planet.PlanetType)
+                };
+                
+                // Add moons if any
+                int moonIndex = 0;
+                foreach (var moon in planet.Moons)
+                {
+                    var moonId = ((char)('a' + moonIndex)).ToString();
+                    var moonObj = new UnifiedSystemGenerator.Moon
+                    {
+                        Id = moonId,
+                        Name = moon.Name,
+                        Type = UnifiedSystemGenerator.ObjectType.Moon,
+                        Mass = (float)moon.Mass * 0.0123f, // Convert to Earth masses (Moon = 0.0123 Earth masses)
+                        Radius = (float)moon.Radius * 0.273f, // Convert to Earth radii (Moon = 0.273 Earth radii)
+                        Parent = planetObj,
+                        OrbitalDistance = moon.SemiMajorAxis / 384400.0, // Convert km to lunar distances
+                        OrbitalPeriod = moon.OrbitalPeriod // Already in days
+                    };
+                    planetObj.Children.Add(moonObj);
+                    moonIndex++;
+                }
+                
+                primaryStar.Children.Add(planetObj);
+                planetIndex++;
+            }
+        }
+        
+        // Add planets for COMPANION stars
+        foreach (var companion in realData.CompanionStars)
+        {
+            if (companion.Planets.Count > 0)
+            {
+                // Find the corresponding star in our system
+                var companionStar = system.AllStars.FirstOrDefault(s => s.Name == companion.SystemName);
+                if (companionStar != null)
+                {
+                    int planetIndex = 1;
+                    foreach (var planet in companion.Planets)
+                    {
+                        var planetObj = new UnifiedSystemGenerator.Planet
+                        {
+                            Id = planetIndex.ToString(),
+                            Name = planet.Name,
+                            Type = UnifiedSystemGenerator.ObjectType.Planet,
+                            Mass = (float)planet.Mass * (planet.MassUnit == "Jupiter" ? 317.8f : 1.0f),
+                            Radius = (float)planet.Radius * (planet.RadiusUnit == "Jupiter" ? 11.21f : 1.0f),
+                            Parent = companionStar,
+                            OrbitalDistance = planet.SemiMajorAxis,
+                            OrbitalPeriod = planet.OrbitalPeriod,
+                            PlanetType = ConvertPlanetType(planet.PlanetType)
+                        };
+                        
+                        // Add moons if any
+                        int moonIndex = 0;
+                        foreach (var moon in planet.Moons)
+                        {
+                            var moonId = ((char)('a' + moonIndex)).ToString();
+                            var moonObj = new UnifiedSystemGenerator.Moon
+                            {
+                                Id = moonId,
+                                Name = moon.Name,
+                                Type = UnifiedSystemGenerator.ObjectType.Moon,
+                                Mass = (float)moon.Mass * 0.0123f,
+                                Radius = (float)moon.Radius * 0.273f,
+                                Parent = planetObj,
+                                OrbitalDistance = moon.SemiMajorAxis / 384400.0,
+                                OrbitalPeriod = moon.OrbitalPeriod
+                            };
+                            planetObj.Children.Add(moonObj);
+                            moonIndex++;
+                        }
+                        
+                        companionStar.Children.Add(planetObj);
+                        planetIndex++;
+                    }
+                }
+            }
+        }
+        
+        if (realData.Planets.Count == 0 && realData.CompanionStars.All(c => c.Planets.Count == 0))
+        {
+            // No real planet data - use procedural generation
+            var tempSystem = unifiedGen.GenerateSystem(star.Seed, ConvertToScientificType(star.Type), star.Mass, 
+                star.Temperature, star.Luminosity);
+            
+            // Copy the generated planets to our real star
+            foreach (var child in tempSystem.PrimaryStar.Children)
+            {
+                if (child is UnifiedSystemGenerator.Planet)
+                {
+                    child.Parent = primaryStar;
+                    primaryStar.Children.Add(child);
+                }
+            }
+        }
+        
+        // Sort children by orbital distance
+        primaryStar.Children = primaryStar.Children.OrderBy(c => c.OrbitalDistance).ToList();
+        
+        return system;
+    }
+    
+    /// <summary>
+    /// Convert planet type string to enum
+    /// </summary>
+    static UnifiedSystemGenerator.PlanetType ConvertPlanetType(string type)
+    {
+        return type.ToLower() switch
+        {
+            "terrestrial" => UnifiedSystemGenerator.PlanetType.Terra,
+            "gas giant" => UnifiedSystemGenerator.PlanetType.Jupiter,
+            "ice giant" => UnifiedSystemGenerator.PlanetType.Neptune,
+            "ocean" => UnifiedSystemGenerator.PlanetType.Aquaria,
+            "rocky" => UnifiedSystemGenerator.PlanetType.Selena,
+            _ => UnifiedSystemGenerator.PlanetType.Terra
+        };
     }
 }

@@ -30,6 +30,14 @@ if %ERRORLEVEL% EQU 0 (
     copy /Y StellarTypeGenerator.cs ScientificMilkyWayVisual\
     copy /Y Star.cs ScientificMilkyWayVisual\
     copy /Y DensityVisualizer.cs ScientificMilkyWayVisual\
+    copy /Y RealStellarData.cs ScientificMilkyWayVisual\
+    
+    REM Copy stellar data directory
+    if exist stellar_data (
+        echo Copying stellar data files...
+        if not exist ScientificMilkyWayVisual\stellar_data mkdir ScientificMilkyWayVisual\stellar_data
+        copy /Y stellar_data\*.csv ScientificMilkyWayVisual\stellar_data\
+    )
     
     REM Add SkiaSharp package
     cd ScientificMilkyWayVisual

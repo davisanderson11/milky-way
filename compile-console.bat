@@ -23,6 +23,14 @@ if %ERRORLEVEL% EQU 0 (
     copy /Y ChunkVisualizer.cs ScientificMilkyWayConsole\
     copy /Y StellarTypeGenerator.cs ScientificMilkyWayConsole\
     copy /Y Star.cs ScientificMilkyWayConsole\
+    copy /Y RealStellarData.cs ScientificMilkyWayConsole\
+    
+    REM Copy stellar data directory
+    if exist stellar_data (
+        echo Copying stellar data files...
+        if not exist ScientificMilkyWayConsole\stellar_data mkdir ScientificMilkyWayConsole\stellar_data
+        copy /Y stellar_data\*.csv ScientificMilkyWayConsole\stellar_data\
+    )
     
     REM Build the project
     cd ScientificMilkyWayConsole
