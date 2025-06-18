@@ -11,9 +11,9 @@ public class ChunkBasedGalaxySystem
 {
     // Chunk dimensions
     private const int CHUNK_SIZE = 100; // 100 light years per chunk
-    private const int MAX_RADIUS_CHUNKS = 1500; // 0-1499 (150,000 ly) - extended for halo
+    private const int MAX_RADIUS_CHUNKS = 2000; // 0-1499 (150,000 ly) - extended for halo
     private const int MAX_ANGULAR_CHUNKS = 360; // 0-359 degrees
-    private const int MAX_Z_CHUNKS = 201; // -100 to 100 (-10000 to 10000 ly) - extended for halo
+    private const int MAX_Z_CHUNKS = 501; // -100 to 100 (-10000 to 10000 ly) - extended for halo
     private const double SOL_EXCLUSION_RADIUS = 80.0;    // ly
 
     
@@ -103,11 +103,11 @@ public class ChunkBasedGalaxySystem
         public ChunkCoordinate(int r, int theta, int z)
         {
             if (r < 0 || r >= 1500)
-                throw new ArgumentException($"ChunkCoordinate R must be 0-1499, got {r}");
+                throw new ArgumentException($"ChunkCoordinate R must be 0-1999, got {r}");
             if (theta < 0 || theta >= 360)
                 throw new ArgumentException($"ChunkCoordinate Theta must be 0-359, got {theta}");
             if (z < -100 || z > 100)
-                throw new ArgumentException($"ChunkCoordinate Z must be -100 to 100, got {z}");
+                throw new ArgumentException($"ChunkCoordinate Z must be -250 to 250, got {z}");
                 
             R = r;
             Theta = theta;
