@@ -79,7 +79,7 @@ public static class GalaxyGenerator
 
         // Base rogue planet rate - lower for gameplay but not too rare
         // This gives roughly 1 rogue planet per 10-100 stars depending on location
-        float baseRate = 0.01f;
+        float baseRate = 0.1f;
 
         // Halo boost - more rogues in the halo (ejected planets)
         float haloBoost = 1.0f;

@@ -54,7 +54,10 @@ public static class StellarTypeGenerator
         if (population == GalaxyGenerator.StellarPopulation.Bulge && position.Length() < 100)
         {
             if (roll < 0.001) return StellarType.BH;   // 0.1% in central region
-            if (roll < 0.005) return StellarType.NS;   // 0.4% in central region
+            if (roll < 0.005) if (rng.Next(1000) == 0)      // 1 in 1000 chance
+        return StellarType.QS;
+    else
+        return StellarType.NS;   // 0.4% in central region
         }
         
         // Convert GalaxyGenerator population to internal enum for switch
@@ -78,7 +81,10 @@ public static class StellarTypeGenerator
                 if (roll < 0.83) return StellarType.DA;     // 8% white dwarfs
                 if (roll < 0.93) return StellarType.K0III;  // 10% red giants
                 if (roll < 0.9995) return StellarType.M5V;  // More M dwarfs
-                if (roll < 0.9999) return StellarType.NS;   // 0.04%
+                if (roll < 0.9999) if (rng.Next(1000) == 0)      // 1 in 1000 chance
+                                return StellarType.QS;
+                                else
+                                return StellarType.NS;   // 0.04%
                 return StellarType.BH;  // 0.01%
                 
             case PopulationType.ThickDisk:
@@ -101,7 +107,10 @@ public static class StellarTypeGenerator
                 if (roll < 0.83) return StellarType.DA;     // 6% white dwarfs
                 if (roll < 0.90) return StellarType.K0III;  // 7% red giants
                 if (roll < 0.9995) return StellarType.M5V;  // More M dwarfs
-                if (roll < 0.99995) return StellarType.NS;  // 0.05%
+                if (roll < 0.99995) if (rng.Next(1000) == 0)      // 1 in 1000 chance
+        return StellarType.QS;
+    else
+        return StellarType.NS;  // 0.05%
                 return StellarType.BH;  // 0.005%
                 
             case PopulationType.ThinDisk:
@@ -135,7 +144,10 @@ public static class StellarTypeGenerator
                 if (roll < 0.915) return StellarType.DA;    // 3% white dwarfs
                 if (roll < 0.945) return StellarType.K0III; // 3% red giants
                 if (roll < 0.9997) return StellarType.M5V;  // More M dwarfs
-                if (roll < 0.99995) return StellarType.NS;  // 0.025%
+                if (roll < 0.99995) if (rng.Next(1000) == 0)      // 1 in 1000 chance
+        return StellarType.QS;
+    else
+        return StellarType.NS;  // 0.025%
                 return StellarType.BH;  // 0.005%
                 
             case PopulationType.Bulge:
@@ -158,7 +170,10 @@ public static class StellarTypeGenerator
                 if (roll < 0.78) return StellarType.DA;     // 8% white dwarfs
                 if (roll < 0.88) return StellarType.K0III;  // 10% red giants
                 if (roll < 0.9995) return StellarType.M5V;  // More M dwarfs
-                if (roll < 0.99995) return StellarType.NS;  // 0.05%
+                if (roll < 0.99995) if (rng.Next(1000) == 0)      // 1 in 1000 chance
+        return StellarType.QS;
+    else
+        return StellarType.NS;  // 0.05%
                 return StellarType.BH;  // 0.005%
                 
             default:
@@ -211,6 +226,8 @@ public static class StellarTypeGenerator
                 return (0.6f, 10000f, new GalaxyGenerator.Vector3(0.95f, 0.95f, 1.0f), 0.01f);
             case StellarType.NS:
                 return (1.4f, 1000000f, new GalaxyGenerator.Vector3(0.7f, 0.7f, 1.0f), 0.001f);
+            case StellarType.QS:
+                return (2.0f, 1000000f, new GalaxyGenerator.Vector3(0.7f, 0.8f, 1.0f), 0.003f);
             case StellarType.BH:
                 return (10f, 0f, GalaxyGenerator.Vector3.Zero, 0f);
             case StellarType.SMBH:

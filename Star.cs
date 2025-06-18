@@ -133,7 +133,7 @@ public class Star
             StellarTypeGenerator.StellarType.DA => StellarTypeGenerator.StellarType.DA,
             StellarTypeGenerator.StellarType.NS => StellarTypeGenerator.StellarType.NS,
             StellarTypeGenerator.StellarType.BH => StellarTypeGenerator.StellarType.BH,
-            StellarTypeGenerator.StellarType.QS => StellarTypeGenerator.StellarType.NS, // Treat as neutron star
+            StellarTypeGenerator.StellarType.QS => StellarTypeGenerator.StellarType.QS, // Treat as neutron star
             StellarTypeGenerator.StellarType.SMBH => StellarTypeGenerator.StellarType.SMBH,
             
             _ => StellarTypeGenerator.StellarType.G5V

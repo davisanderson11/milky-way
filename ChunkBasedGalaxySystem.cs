@@ -193,75 +193,82 @@ public class ChunkBasedGalaxySystem
         return (chunkR, chunkTheta, chunkZ, starIndex);
     }
     
-    /// <summary>
-    /// Generate rogue planets for a chunk (deterministic)
-    /// </summary>
-    private List<RoguePlanet> GenerateRoguePlanetsForChunk(ChunkCoordinate chunk)
+private List<RoguePlanet> GenerateRoguePlanetsForChunk(ChunkCoordinate chunk)
+{
+    var roguePlanets = new List<RoguePlanet>();
+    var bounds       = chunk.GetBounds();
+
+    // 1) Compute center position for density
+    float centerR     = (float)((bounds.rMin + bounds.rMax) * 0.5);
+    float centerTheta = (float)((bounds.thetaMin + bounds.thetaMax) * 0.5);
+    float centerZ     = (float)((bounds.zMin + bounds.zMax) * 0.5);
+    float xC = centerR * (float)Math.Cos(centerTheta);
+    float yC = centerR * (float)Math.Sin(centerTheta);
+    var cartesianPos = new GalaxyGenerator.Vector3(xC, yC, centerZ);
+
+    // 2) Evaluate density and expected count
+    float rogueDensity = GalaxyGenerator.CalculateRoguePlanetDensity(cartesianPos);
+    float chunkVolume  = (float)(
+        (bounds.rMax - bounds.rMin)
+      * (bounds.rMax * (bounds.thetaMax - bounds.thetaMin))
+      * (bounds.zMax - bounds.zMin)
+    );
+    float expectedRogues = rogueDensity * chunkVolume;
+
+    // 3) Deterministic count via SplitMix64
+    ulong smStateCount = ((ulong)EncodeSeed(chunk.R, chunk.Theta, chunk.Z, 0))
+                         ^ 0xDEADBEEFUL;
+    int rogueCount;
+    if (expectedRogues < 1f)
     {
-        var roguePlanets = new List<RoguePlanet>();
-        var bounds = chunk.GetBounds();
-        
-        // Use chunk center for density calculation
-        // Use chunk center for density calculation
-        // Note: bounds are in cylindrical coordinates (r, theta, z)
-        var centerR = (float)((bounds.rMin + bounds.rMax) / 2);
-        var centerTheta = (float)((bounds.thetaMin + bounds.thetaMax) / 2);
-        var centerZ = (float)((bounds.zMin + bounds.zMax) / 2);
-        
-        // Convert to Cartesian for density calculation
-        float x = centerR * (float)Math.Cos(centerTheta);
-        float y = centerR * (float)Math.Sin(centerTheta);
-        var cartesianPos = new GalaxyGenerator.Vector3(x, y, centerZ);
-        
-        // Calculate rogue planet density
-        float rogueDensity = GalaxyGenerator.CalculateRoguePlanetDensity(cartesianPos);
-        
-        // Expected number of rogue planets (using chunk volume)
-        float chunkVolume = (float)((bounds.rMax - bounds.rMin) * 
-                           (bounds.rMax * (bounds.thetaMax - bounds.thetaMin)) * 
-                           (bounds.zMax - bounds.zMin));
-        float expectedRogues = rogueDensity * chunkVolume; // No scale factor needed now
-        
-        // Use Poisson-like distribution
-        var baseRng = new Random(chunk.GetHashCode() ^ unchecked((int)0x524F475545)); // "ROGUE" in hex
-        int rogueCount = 0;
-        
-        if (expectedRogues < 1)
-        {
-            if (baseRng.NextDouble() < expectedRogues)
-                rogueCount = 1;
-        }
-        else
-        {
-            rogueCount = (int)expectedRogues;
-            if (baseRng.NextDouble() < (expectedRogues - rogueCount))
-                rogueCount++;
-        }
-        
-        // Generate each rogue planet
-        for (int i = 0; i < rogueCount; i++)
-        {
-            // Generate position within chunk
-            var rng = new Random(chunk.GetHashCode() ^ i ^ unchecked((int)0x524F475545));
-            
-            float r = (float)(bounds.rMin + rng.NextDouble() * (bounds.rMax - bounds.rMin));
-            float theta = (float)(bounds.thetaMin + rng.NextDouble() * (bounds.thetaMax - bounds.thetaMin));
-            float z = (float)(bounds.zMin + rng.NextDouble() * (bounds.zMax - bounds.zMin));
-            
-            // Convert to Cartesian
-            float px = r * (float)Math.Cos(theta);
-            float py = r * (float)Math.Sin(theta);
-            var position = new GalaxyGenerator.Vector3(px, py, z);
-            
-            // Create seed with negative index
-            long rogueSeed = EncodeSeed(chunk.R, chunk.Theta, chunk.Z, (long)i | 0x800000000L); // Set high bit for negative
-            
-            var rogue = RoguePlanet.Generate(rogueSeed, position, chunk.R, chunk.Theta, chunk.Z, -(i + 1));
-            roguePlanets.Add(rogue);
-        }
-        
-        return roguePlanets;
+        double u0     = (SplitMix64(ref smStateCount) >> 11) * (1.0 / (1UL << 53));
+        rogueCount    = (u0 < expectedRogues) ? 1 : 0;
     }
+    else
+    {
+        rogueCount    = (int)expectedRogues;
+        double uFrac  = (SplitMix64(ref smStateCount) >> 11) * (1.0 / (1UL << 53));
+        if (uFrac < (expectedRogues - rogueCount))
+            rogueCount++;
+    }
+
+    // 4) Generate each rogue planet with the same PRNG style as stars
+    for (int i = 0; i < rogueCount; i++)
+    {
+        long rogueSeed  = EncodeSeed(chunk.R, chunk.Theta, chunk.Z, (long)i | 0x800000000L);
+        ulong smStatePos = (ulong)rogueSeed;
+
+        // three uniforms in [0,1)
+        double u1 = (SplitMix64(ref smStatePos) >> 11) * (1.0 / (1UL << 53));
+        double u2 = (SplitMix64(ref smStatePos) >> 11) * (1.0 / (1UL << 53));
+        double u3 = (SplitMix64(ref smStatePos) >> 11) * (1.0 / (1UL << 53));
+
+        // --- here are the explicit casts of the whole RHS ---
+        float rr     = (float)(bounds.rMin
+                            + u1 * (bounds.rMax - bounds.rMin));
+        float thetaF = (float)(bounds.thetaMin
+                            + u2 * (bounds.thetaMax - bounds.thetaMin));
+        float zz     = (float)(bounds.zMin
+                            + u3 * (bounds.zMax - bounds.zMin));
+        // --------------------------------------------------------
+
+        var position = new GalaxyGenerator.Vector3(
+            rr * (float)Math.Cos(thetaF),
+            rr * (float)Math.Sin(thetaF),
+            zz
+        );
+
+        var rogue = RoguePlanet.Generate(
+            rogueSeed, position,
+            chunk.R, chunk.Theta, chunk.Z,
+            -(i + 1)
+        );
+        roguePlanets.Add(rogue);
+    }
+
+    return roguePlanets;
+}
+
     
     /// <summary>
     /// Check if a seed refers to a rogue planet
