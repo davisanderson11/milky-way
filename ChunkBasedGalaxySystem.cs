@@ -722,207 +722,213 @@ private List<RoguePlanet> GenerateRoguePlanetsForChunk(ChunkCoordinate chunk)
     /// Investigate a chunk and export to CSV
     /// </summary>
     public void InvestigateChunk(string chunkId, string? outputPath = null, bool includeRoguePlanets = false)
+{
+    var chunk = new ChunkCoordinate(chunkId);
+    var bounds = chunk.GetBounds();
+    
+    Console.WriteLine($"\n=== Investigating Chunk {chunkId} ===");
+    Console.WriteLine($"Radial range: {bounds.rMin:F0} - {bounds.rMax:F0} ly");
+    Console.WriteLine($"Angular range: {bounds.thetaMin * 180 / Math.PI:F0}° - {bounds.thetaMax * 180 / Math.PI:F0}°");
+    Console.WriteLine($"Vertical range: {bounds.zMin:F0} - {bounds.zMax:F0} ly");
+    
+    // Calculate chunk volume
+    var deltaTheta = bounds.thetaMax - bounds.thetaMin;
+    var avgRadius = (bounds.rMin + bounds.rMax) / 2;
+    var deltaR = bounds.rMax - bounds.rMin;
+    var deltaZ = bounds.zMax - bounds.zMin;
+    var volume = avgRadius * deltaR * deltaTheta * deltaZ;
+    Console.WriteLine($"Chunk volume: {volume:E2} ly³");
+    
+    // Calculate expected density at chunk center
+    var centerR = (bounds.rMin + bounds.rMax) / 2;
+    var centerTheta = (bounds.thetaMin + bounds.thetaMax) / 2;
+    var centerZ = (bounds.zMin + bounds.zMax) / 2;
+    var centerX = (float)(centerR * Math.Cos(centerTheta));
+    var centerY = (float)(centerR * Math.Sin(centerTheta));
+    var centerPos = new GalaxyGenerator.Vector3(centerX, centerY, (float)centerZ);
+    var expectedDensity = GalaxyGenerator.GetExpectedStarDensity(centerPos);
+    Console.WriteLine($"Expected density (from formula): {expectedDensity:E3} stars/ly³");
+    
+    // Generate stars - THIS IS FAST NOW!
+    var startTime = DateTime.Now;
+    var stars = new List<Star>();
+    int suppressedCount = 0;
+    
+    // First add special objects (like Sgr A*)
+    var specialObjects = GalacticAnalytics.GetSpecialObjectsInChunk(
+        bounds.rMin, bounds.rMax, bounds.thetaMin, bounds.thetaMax, bounds.zMin, bounds.zMax);
+    stars.AddRange(specialObjects);
+    
+    // Calculate expected stars
+    int expectedStars = CalculateExpectedStars(chunk);
+    
+    // Generate all stars in chunk - count suppressed ones
+    for (int i = 0; i < expectedStars; i++)
     {
-        var chunk = new ChunkCoordinate(chunkId);
-        var bounds = chunk.GetBounds();
-        
-        Console.WriteLine($"\n=== Investigating Chunk {chunkId} ===");
-        Console.WriteLine($"Radial range: {bounds.rMin:F0} - {bounds.rMax:F0} ly");
-        Console.WriteLine($"Angular range: {bounds.thetaMin * 180 / Math.PI:F0}° - {bounds.thetaMax * 180 / Math.PI:F0}°");
-        Console.WriteLine($"Vertical range: {bounds.zMin:F0} - {bounds.zMax:F0} ly");
-        
-        // Calculate chunk volume
-        var deltaTheta = bounds.thetaMax - bounds.thetaMin;
-        var avgRadius = (bounds.rMin + bounds.rMax) / 2;
-        var deltaR = bounds.rMax - bounds.rMin;
-        var deltaZ = bounds.zMax - bounds.zMin;
-        var volume = avgRadius * deltaR * deltaTheta * deltaZ;
-        Console.WriteLine($"Chunk volume: {volume:E2} ly³");
-        
-        // Calculate expected density at chunk center
-        var centerR = (bounds.rMin + bounds.rMax) / 2;
-        var centerTheta = (bounds.thetaMin + bounds.thetaMax) / 2;
-        var centerZ = (bounds.zMin + bounds.zMax) / 2;
-        var centerX = (float)(centerR * Math.Cos(centerTheta));
-        var centerY = (float)(centerR * Math.Sin(centerTheta));
-        var centerPos = new GalaxyGenerator.Vector3(centerX, centerY, (float)centerZ);
-        var expectedDensity = GalaxyGenerator.GetExpectedStarDensity(centerPos);
-        Console.WriteLine($"Expected density (from formula): {expectedDensity:E3} stars/ly³");
-        
-        // Generate stars - THIS IS FAST NOW!
-        var startTime = DateTime.Now;
-        var stars = new List<Star>();
-        int suppressedCount = 0;
-        
-        // First add special objects (like Sgr A*)
-        var specialObjects = GalacticAnalytics.GetSpecialObjectsInChunk(
-            bounds.rMin, bounds.rMax, bounds.thetaMin, bounds.thetaMax, bounds.zMin, bounds.zMax);
-        stars.AddRange(specialObjects);
-        
-        // Calculate expected stars
-        int expectedStars = CalculateExpectedStars(chunk);
-        
-        // Generate all stars in chunk - count suppressed ones
-        for (int i = 0; i < expectedStars; i++)
+        long seed = EncodeSeed(chunk.R, chunk.Theta, chunk.Z, i);
+        try
         {
-            long seed = EncodeSeed(chunk.R, chunk.Theta, chunk.Z, i);
-            try
+            var star = GetStarBySeed(seed);
+            if (star != null)
             {
-                var star = GetStarBySeed(seed);
                 stars.Add(star);
-            }
-            catch (ArgumentException ex)
-            {
-                // Count suppressed stars within Sol bubble
-                if (ex.Message.Contains("suppressed for real stellar data"))
-                {
-                    suppressedCount++;
-                    continue;
-                }
-                else
-                {
-                    throw; // Re-throw other exceptions
-                }
-            }
-        }
-        
-        var elapsed = (DateTime.Now - startTime).TotalSeconds;
-        
-        // Add real stars if in Sol bubble
-        int realStarsBefore = stars.Count;
-        GenerateRealStarsInChunk(chunk, ref stars);
-        int realStarsAdded = stars.Count - realStarsBefore;
-        if (realStarsAdded > 0)
-        {
-            Console.WriteLine($"Real stars added to chunk: {realStarsAdded}");
-        }
-        
-        // Fill gaps with procedural stars if we're in the Sol bubble but have too few stars
-        if (suppressedCount > 0) // If we have less than 50% of expected stars
-        {
-            Console.WriteLine($"Filling gaps: have {stars.Count} stars, expected ~{expectedStars}");
-        }
-        
-        Console.WriteLine($"Stars in chunk: {stars.Count} (generated in {elapsed:F2}s)");
-        if (suppressedCount > 0)
-        {
-            Console.WriteLine($"Stars suppressed (Sol bubble): {suppressedCount}");
-            Console.WriteLine($"  Note: These {suppressedCount} positions are reserved for real stellar data");
-        }
-        
-        // Calculate actual density
-        var actualDensity = stars.Count / volume;
-        var densityRatio = actualDensity / expectedDensity;
-        Console.WriteLine($"Actual density: {actualDensity:E3} stars/ly³");
-        Console.WriteLine($"Density ratio (actual/expected): {densityRatio:F2}");
-        Console.WriteLine($"Region: {GalaxyGenerator.DetermineRegion(centerPos)}");
-        
-        // Generate rogue planets if requested
-        List<RoguePlanet>? roguePlanets = null;
-        if (includeRoguePlanets)
-        {
-            roguePlanets = GenerateRoguePlanetsForChunk(chunk);
-            Console.WriteLine($"\nRogue planets in chunk: {roguePlanets.Count}");
-            
-            if (roguePlanets.Count > 0)
-            {
-                var rogueTypes = roguePlanets.GroupBy(r => r.Type).OrderByDescending(g => g.Count());
-                Console.WriteLine("Rogue planet types:");
-                foreach (var group in rogueTypes)
-                {
-                    Console.WriteLine($"  {group.Key}: {group.Count()} ({group.Count() * 100.0 / roguePlanets.Count:F1}%)");
-                }
-                
-                // Rogue-to-star ratio
-                Console.WriteLine($"Rogue-to-star ratio: 1:{(stars.Count > 0 ? stars.Count / (double)Math.Max(1, roguePlanets.Count) : 0):F1}");
-            }
-        }
-        
-        // Statistics
-        if (stars.Count > 0)
-        {
-            var typeGroups = stars.GroupBy(s => s.Type).OrderByDescending(g => g.Count());
-            Console.WriteLine("\nStellar types:");
-            foreach (var group in typeGroups)
-            {
-                string typeDisplay = group.Key.ToString();
-                Console.WriteLine($"  {typeDisplay}: {group.Count()} ({group.Count() * 100.0 / stars.Count:F1}%)");
-            }
-        }
-        
-        // Export to CSV
-        if (outputPath == null)
-        {
-            outputPath = includeRoguePlanets ? $"chunk_{chunkId}_with_rogues_data.csv" : $"chunk_{chunkId}_data.csv";
-        }
-        
-        using (var writer = new StreamWriter(outputPath))
-        {
-            if (includeRoguePlanets && roguePlanets != null && roguePlanets.Count > 0)
-            {
-                // Include rogue planets - different CSV format
-                writer.WriteLine("ChunkID,ObjectType,Index,Seed,X,Y,Z,R,Theta,Type,Mass,Radius,Temperature,Luminosity,ColorR,ColorG,ColorB,Population,Region,Planets,IsMultiple,SystemName,MoonCount,Origin,IsRealStar");
-                
-                // Write stars
-                foreach (var star in stars)
-                {
-                    var r = Math.Sqrt(star.Position.X * star.Position.X + star.Position.Y * star.Position.Y);
-                    var theta = Math.Atan2(star.Position.Y, star.Position.X) * 180 / Math.PI;
-                    if (theta < 0) theta += 360;
-                    
-                    // Decode to get star index (or use special value for real stars)
-                    long starIndex = 0;
-                    if (IsRealStarSeed(star.Seed))
-                    {
-                        var (_, _, _, idx) = DecodeSeed(star.Seed);
-                        starIndex = idx & 0x3FFFFFFF; // Remove the real star bit to get catalog ID
-                    }
-                    else
-                    {
-                        var (_, _, _, idx) = DecodeSeed(star.Seed);
-                        starIndex = idx;
-                    }
-                    
-                    writer.WriteLine($"{chunk},Star,{starIndex},{star.Seed},{star.Position.X:F2},{star.Position.Y:F2},{star.Position.Z:F2}," +
-                        $"{r:F2},{theta:F2},{star.Type},{star.Mass:F3},0,{star.Temperature:F0},{star.Luminosity:F4}," +
-                        $"{star.Color.X:F3},{star.Color.Y:F3},{star.Color.Z:F3},{star.Population},{star.Region},{star.PlanetCount}," +
-                        $"{star.IsMultiple},{star.SystemName},,{star.IsRealStar}");
-                }
-                
-                // Write rogue planets
-                foreach (var rogue in roguePlanets)
-                {
-                    var r = Math.Sqrt(rogue.Position.X * rogue.Position.X + rogue.Position.Y * rogue.Position.Y);
-                    var theta = Math.Atan2(rogue.Position.Y, rogue.Position.X) * 180 / Math.PI;
-                    if (theta < 0) theta += 360;
-                    
-                    writer.WriteLine($"{chunk},RoguePlanet,{rogue.Index},{rogue.Seed},{rogue.Position.X:F2},{rogue.Position.Y:F2},{rogue.Position.Z:F2}," +
-                        $"{r:F2},{theta:F2},{rogue.Type},{rogue.Mass:F3},{rogue.Radius:F1},{rogue.Temperature:F0},0," +
-                        $"0,0,0,,,0," +
-                        $"false,Rogue,{rogue.MoonCount},{rogue.Origin},false");
-                }
             }
             else
             {
-                // Standard star-only format
-                writer.WriteLine("ChunkID,Seed,X,Y,Z,R,Theta,Type,Mass,Temperature,Luminosity,ColorR,ColorG,ColorB,Population,Region,Planets,IsMultiple,SystemName,IsRealStar");
-                
-                foreach (var star in stars)
-                {
-                    var r = Math.Sqrt(star.Position.X * star.Position.X + star.Position.Y * star.Position.Y);
-                    var theta = Math.Atan2(star.Position.Y, star.Position.X) * 180 / Math.PI;
-                    if (theta < 0) theta += 360;
-                    
-                    writer.WriteLine($"{chunk},{star.Seed},{star.Position.X:F2},{star.Position.Y:F2},{star.Position.Z:F2}," +
-                        $"{r:F2},{theta:F2},{star.Type},{star.Mass:F3},{star.Temperature:F0},{star.Luminosity:F4}," +
-                        $"{star.Color.X:F3},{star.Color.Y:F3},{star.Color.Z:F3},{star.Population},{star.Region},{star.PlanetCount}," +
-                        $"{star.IsMultiple},{star.SystemName},{star.IsRealStar}");
-                }
+                // Suppressed by real-data rules
+                suppressedCount++;
             }
         }
-        
-        Console.WriteLine($"Data exported to: {outputPath}");
+        catch (ArgumentException ex)
+        {
+            // Count suppressed stars within Sol bubble
+            if (ex.Message.Contains("suppressed for real stellar data"))
+            {
+                suppressedCount++;
+                continue;
+            }
+            else
+            {
+                throw; // Re-throw other exceptions
+            }
+        }
     }
+    
+    var elapsed = (DateTime.Now - startTime).TotalSeconds;
+    
+    // Add real stars if in Sol bubble
+    int realStarsBefore = stars.Count;
+    GenerateRealStarsInChunk(chunk, ref stars);
+    int realStarsAdded = stars.Count - realStarsBefore;
+    if (realStarsAdded > 0)
+    {
+        Console.WriteLine($"Real stars added to chunk: {realStarsAdded}");
+    }
+    
+    // Fill gaps with procedural stars if we're in the Sol bubble but have too few stars
+    if (suppressedCount > 0)
+    {
+        Console.WriteLine($"Filling gaps: have {stars.Count} stars, expected ~{expectedStars}");
+    }
+    
+    Console.WriteLine($"Stars in chunk: {stars.Count} (generated in {elapsed:F2}s)");
+    if (suppressedCount > 0)
+    {
+        Console.WriteLine($"Stars suppressed (Sol bubble): {suppressedCount}");
+        Console.WriteLine($"  Note: These {suppressedCount} positions are reserved for real stellar data");
+    }
+    
+    // Calculate actual density
+    var actualDensity = stars.Count / volume;
+    var densityRatio = actualDensity / expectedDensity;
+    Console.WriteLine($"Actual density: {actualDensity:E3} stars/ly³");
+    Console.WriteLine($"Density ratio (actual/expected): {densityRatio:F2}");
+    Console.WriteLine($"Region: {GalaxyGenerator.DetermineRegion(centerPos)}");
+    
+    // Generate rogue planets if requested
+    List<RoguePlanet>? roguePlanets = null;
+    if (includeRoguePlanets)
+    {
+        roguePlanets = GenerateRoguePlanetsForChunk(chunk);
+        Console.WriteLine($"\nRogue planets in chunk: {roguePlanets.Count}");
+        
+        if (roguePlanets.Count > 0)
+        {
+            var rogueTypes = roguePlanets.GroupBy(r => r.Type).OrderByDescending(g => g.Count());
+            Console.WriteLine("Rogue planet types:");
+            foreach (var group in rogueTypes)
+            {
+                Console.WriteLine($"  {group.Key}: {group.Count()} ({group.Count() * 100.0 / roguePlanets.Count:F1}%)");
+            }
+            
+            // Rogue-to-star ratio
+            Console.WriteLine($"Rogue-to-star ratio: 1:{(stars.Count > 0 ? stars.Count / (double)Math.Max(1, roguePlanets.Count) : 0):F1}");
+        }
+    }
+    
+    // Statistics
+    if (stars.Count > 0)
+    {
+        var typeGroups = stars.GroupBy(s => s.Type).OrderByDescending(g => g.Count());
+        Console.WriteLine("\nStellar types:");
+        foreach (var group in typeGroups)
+        {
+            string typeDisplay = group.Key.ToString();
+            Console.WriteLine($"  {typeDisplay}: {group.Count()} ({group.Count() * 100.0 / stars.Count:F1}%)");
+        }
+    }
+    
+    // Export to CSV
+    if (outputPath == null)
+    {
+        outputPath = includeRoguePlanets ? $"chunk_{chunkId}_with_rogues_data.csv" : $"chunk_{chunkId}_data.csv";
+    }
+    
+    using (var writer = new StreamWriter(outputPath))
+    {
+        if (includeRoguePlanets && roguePlanets != null && roguePlanets.Count > 0)
+        {
+            writer.WriteLine("ChunkID,ObjectType,Index,Seed,X,Y,Z,R,Theta,Type,Mass,Radius,Temperature,Luminosity,ColorR,ColorG,ColorB,Population,Region,Planets,IsMultiple,SystemName,MoonCount,Origin,IsRealStar");
+            
+            // Write stars
+            foreach (var star in stars)
+            {
+                var r = Math.Sqrt(star.Position.X * star.Position.X + star.Position.Y * star.Position.Y);
+                var theta = Math.Atan2(star.Position.Y, star.Position.X) * 180 / Math.PI;
+                if (theta < 0) theta += 360;
+                
+                long starIndex;
+                if (IsRealStarSeed(star.Seed))
+                {
+                    var (_, _, _, idx) = DecodeSeed(star.Seed);
+                    starIndex = idx & 0x3FFFFFFF; // Remove the real star bit
+                }
+                else
+                {
+                    var (_, _, _, idx) = DecodeSeed(star.Seed);
+                    starIndex = idx;
+                }
+                
+                writer.WriteLine($"{chunk},Star,{starIndex},{star.Seed},{star.Position.X:F2},{star.Position.Y:F2},{star.Position.Z:F2}," +
+                    $"{r:F2},{theta:F2},{star.Type},{star.Mass:F3},0,{star.Temperature:F0},{star.Luminosity:F4}," +
+                    $"{star.Color.X:F3},{star.Color.Y:F3},{star.Color.Z:F3},{star.Population},{star.Region},{star.PlanetCount}," +
+                    $"{star.IsMultiple},{star.SystemName},,{star.IsRealStar}");
+            }
+            
+            // Write rogue planets
+            foreach (var rogue in roguePlanets)
+            {
+                var r = Math.Sqrt(rogue.Position.X * rogue.Position.X + rogue.Position.Y * rogue.Position.Y);
+                var theta = Math.Atan2(rogue.Position.Y, rogue.Position.X) * 180 / Math.PI;
+                if (theta < 0) theta += 360;
+                
+                writer.WriteLine($"{chunk},RoguePlanet,{rogue.Index},{rogue.Seed},{rogue.Position.X:F2},{rogue.Position.Y:F2},{rogue.Position.Z:F2}," +
+                    $"{r:F2},{theta:F2},{rogue.Type},{rogue.Mass:F3},{rogue.Radius:F1},{rogue.Temperature:F0},0," +
+                    $"0,0,0,,,0," +
+                    $"false,Rogue,{rogue.MoonCount},{rogue.Origin},false");
+            }
+        }
+        else
+        {
+            writer.WriteLine("ChunkID,Seed,X,Y,Z,R,Theta,Type,Mass,Temperature,Luminosity,ColorR,ColorG,ColorB,Population,Region,Planets,IsMultiple,SystemName,IsRealStar");
+            
+            foreach (var star in stars)
+            {
+                var r = Math.Sqrt(star.Position.X * star.Position.X + star.Position.Y * star.Position.Y);
+                var theta = Math.Atan2(star.Position.Y, star.Position.X) * 180 / Math.PI;
+                if (theta < 0) theta += 360;
+                
+                writer.WriteLine($"{chunk},{star.Seed},{star.Position.X:F2},{star.Position.Y:F2},{star.Position.Z:F2}," +
+                    $"{r:F2},{theta:F2},{star.Type},{star.Mass:F3},{star.Temperature:F0},{star.Luminosity:F4}," +
+                    $"{star.Color.X:F3},{star.Color.Y:F3},{star.Color.Z:F3},{star.Population},{star.Region},{star.PlanetCount}," +
+                    $"{star.IsMultiple},{star.SystemName},{star.IsRealStar}");
+            }
+        }
+    }
+    
+    Console.WriteLine($"Data exported to: {outputPath}");
+}
+
     
     
     /// <summary>
