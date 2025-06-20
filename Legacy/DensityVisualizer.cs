@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using SkiaSharp;
+using MilkyWay.Core;
 
 /// <summary>
 /// Pure mathematical density visualizer that uses GalaxyGenerator formulas
