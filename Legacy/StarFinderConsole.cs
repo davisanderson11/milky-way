@@ -160,12 +160,12 @@ namespace MilkyWay.Legacy
                     if (star.IsRealStar && star.RealStarData != null)
                     {
                         // Convert real star data to unified system
-                        system = ConvertRealStarToSystem(star, unifiedGen);
+                        system = Converter.ConvertRealStarToSystem(star, unifiedGen);
                     }
                     else
                     {
                         // Generate procedural system
-                        system = unifiedGen.GenerateSystem(star.Seed, ConvertToScientificType(star.Type), star.Mass,
+                        system = unifiedGen.GenerateSystem(star.Seed, Converter.ConvertToScientificType(star.Type), star.Mass,
                             star.Temperature, star.Luminosity);
                     }
 

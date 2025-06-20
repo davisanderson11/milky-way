@@ -1,56 +1,56 @@
 PlanetName,StarName,Mass,MassUnit,Radius,RadiusUnit,Period,SemiMajorAxis,Eccentricity,Type
-Mercury,Sol,0.055,Earth,0.383,Earth,87.969,0.387,0.206,Terrestrial
-Venus,Sol,0.815,Earth,0.949,Earth,224.701,0.723,0.007,Terrestrial
-Earth,Sol,1.0,Earth,1.0,Earth,365.256,1.0,0.017,Terrestrial
-Mars,Sol,0.107,Earth,0.532,Earth,686.980,1.524,0.093,Terrestrial
-Jupiter,Sol,1.0,Jupiter,1.0,Jupiter,4332.589,5.203,0.048,Gas Giant
-Saturn,Sol,0.299,Jupiter,0.843,Jupiter,10759.22,9.537,0.054,Gas Giant
+Mercury,Sol,0.055,Earth,0.383,Earth,87.969,0.387,0.206,Terra
+Venus,Sol,0.815,Earth,0.949,Earth,224.701,0.723,0.007,Terra
+Earth,Sol,1,Earth,1,Earth,365.256,1,0.017,Terra
+Mars,Sol,0.107,Earth,0.532,Earth,686.98,1.524,0.093,Terra
+Jupiter,Sol,1,Jupiter,1,Jupiter,4332.589,5.203,0.048,Jupiter
+Saturn,Sol,0.299,Jupiter,0.843,Jupiter,10759.22,9.537,0.054,Jupiter
 Uranus,Sol,0.046,Jupiter,0.354,Jupiter,30685.4,19.191,0.047,Ice Giant
-Neptune,Sol,0.054,Jupiter,0.346,Jupiter,60189.0,30.069,0.009,Ice Giant
-Proxima Centauri b,Proxima Centauri,1.27,Earth,1.08,Earth,11.186,0.0485,0.11,Terrestrial
-Proxima Centauri c,Proxima Centauri,7.0,Earth,1.5,Earth,1928,1.489,0.04,Super-Earth
-Epsilon Eridani b,Epsilon Eridani,0.78,Jupiter,1.2,Jupiter,2502,3.39,0.07,Gas Giant
-Tau Ceti e,Tau Ceti,3.93,Earth,1.8,Earth,168.12,0.538,0.18,Super-Earth
-Tau Ceti f,Tau Ceti,3.93,Earth,1.8,Earth,636.13,1.334,0.16,Super-Earth
-Tau Ceti g,Tau Ceti,1.75,Earth,1.2,Earth,20.0,0.133,0.06,Super-Earth
-Tau Ceti h,Tau Ceti,1.83,Earth,1.3,Earth,49.41,0.243,0.23,Super-Earth
-YZ Ceti b,YZ Ceti,0.75,Earth,0.9,Earth,2.02,0.016,0.06,Terrestrial
-YZ Ceti c,YZ Ceti,0.98,Earth,1.0,Earth,3.06,0.022,0.04,Terrestrial
-YZ Ceti d,YZ Ceti,1.14,Earth,1.05,Earth,4.66,0.029,0.13,Terrestrial
-Kapteyn's Star b,Kapteyn's Star,4.5,Earth,1.6,Earth,48.6,0.168,0.21,Super-Earth
-Kapteyn's Star c,Kapteyn's Star,7.0,Earth,2.0,Earth,121.5,0.311,0.23,Super-Earth
-Wolf 1061 c,Wolf 1061,3.41,Earth,1.5,Earth,17.87,0.089,0.11,Super-Earth
-Wolf 1061 d,Wolf 1061,7.7,Earth,2.0,Earth,217.2,0.47,0.55,Super-Earth
-Gliese 667C b,Gliese 667C,5.94,Earth,1.8,Earth,7.2,0.049,0.13,Super-Earth
-Gliese 667C c,Gliese 667C,3.86,Earth,1.5,Earth,28.14,0.125,0.02,Super-Earth
-Gliese 876 b,Gliese 876,2.27,Jupiter,1.2,Jupiter,61.12,0.208,0.032,Gas Giant
-Gliese 876 c,Gliese 876,0.714,Jupiter,0.9,Jupiter,30.09,0.130,0.256,Gas Giant
-Gliese 876 d,Gliese 876,6.83,Earth,2.0,Earth,1.94,0.021,0.21,Super-Earth
-Gliese 876 e,Gliese 876,14.6,Earth,2.5,Earth,124.26,0.334,0.055,Neptune-like
-Gliese 832 b,Gliese 832,0.64,Jupiter,0.8,Jupiter,3416,3.4,0.12,Gas Giant
-Gliese 832 c,Gliese 832,5.4,Earth,1.7,Earth,35.68,0.163,0.18,Super-Earth
-HD 20794 b,HD 20794,2.7,Earth,1.3,Earth,18.3,0.121,0.0,Super-Earth
-HD 20794 c,HD 20794,2.4,Earth,1.2,Earth,40.1,0.205,0.0,Super-Earth
-HD 20794 d,HD 20794,4.8,Earth,1.6,Earth,90.3,0.35,0.0,Super-Earth
-HD 20794 e,HD 20794,4.7,Earth,1.6,Earth,147.0,0.509,0.0,Super-Earth
-HD 26965 b,HD 26965,8.4,Earth,2.1,Earth,42.38,0.215,0.05,Super-Earth
-Luyten b,Luyten's Star,2.89,Earth,1.4,Earth,18.65,0.091,0.10,Super-Earth
-Teegarden's Star b,Teegarden's Star,1.05,Earth,1.02,Earth,4.91,0.025,0.0,Terrestrial
-Teegarden's Star c,Teegarden's Star,1.11,Earth,1.04,Earth,11.41,0.044,0.0,Terrestrial
-K2-18b,K2-18,8.6,Earth,2.3,Earth,32.94,0.143,0.0,Mini-Neptune
-GJ 1214 b,GJ 1214,6.55,Earth,2.68,Earth,1.58,0.014,0.27,Mini-Neptune
-GJ 436 b,GJ 436,22.2,Earth,4.3,Earth,2.64,0.029,0.15,Neptune-like
-GJ 3293 b,GJ 3293,23.5,Earth,4.5,Earth,30.6,0.144,0.06,Neptune-like
-GJ 3293 c,GJ 3293,21.8,Earth,4.3,Earth,122.6,0.364,0.37,Neptune-like
-HD 219134 b,HD 219134,4.74,Earth,1.6,Earth,3.09,0.039,0.0,Super-Earth
-HD 219134 c,HD 219134,4.36,Earth,1.5,Earth,6.77,0.065,0.06,Super-Earth
-HD 219134 d,HD 219134,16.2,Earth,2.7,Earth,46.86,0.237,0.14,Neptune-like
-HD 219134 f,HD 219134,7.3,Earth,1.9,Earth,22.72,0.146,0.15,Super-Earth
-HD 219134 g,HD 219134,11.0,Earth,2.3,Earth,94.2,0.375,0.06,Neptune-like
-TRAPPIST-1 b,TRAPPIST-1,1.017,Earth,1.121,Earth,1.51,0.0115,0.0,Terrestrial
-TRAPPIST-1 c,TRAPPIST-1,1.156,Earth,1.095,Earth,2.42,0.0158,0.0,Terrestrial
-TRAPPIST-1 d,TRAPPIST-1,0.297,Earth,0.784,Earth,4.05,0.0223,0.0,Terrestrial
-TRAPPIST-1 e,TRAPPIST-1,0.772,Earth,0.910,Earth,6.10,0.0293,0.0,Terrestrial
-TRAPPIST-1 f,TRAPPIST-1,0.934,Earth,1.046,Earth,9.21,0.0385,0.0,Terrestrial
-TRAPPIST-1 g,TRAPPIST-1,1.148,Earth,1.148,Earth,12.35,0.0469,0.0,Terrestrial
-TRAPPIST-1 h,TRAPPIST-1,0.331,Earth,0.773,Earth,18.77,0.0619,0.0,Terrestrial
+Neptune,Sol,0.054,Jupiter,0.346,Jupiter,60189,30.069,0.009,Ice Giant
+Proxima Centauri b,Proxima Centauri,1.27,Earth,1.08,Earth,11.186,0.0485,0.11,Terra
+Proxima Centauri c,Proxima Centauri,7,Earth,1.5,Earth,1928,1.489,0.04,Terra
+Epsilon Eridani b,Epsilon Eridani,0.78,Jupiter,1.2,Jupiter,2502,3.39,0.07,Jupiter
+Tau Ceti e,Tau Ceti,3.93,Earth,1.8,Earth,168.12,0.538,0.18,Terra
+Tau Ceti f,Tau Ceti,3.93,Earth,1.8,Earth,636.13,1.334,0.16,Terra
+Tau Ceti g,Tau Ceti,1.75,Earth,1.2,Earth,20,0.133,0.06,Terra
+Tau Ceti h,Tau Ceti,1.83,Earth,1.3,Earth,49.41,0.243,0.23,Terra
+YZ Ceti b,YZ Ceti,0.75,Earth,0.9,Earth,2.02,0.016,0.06,Terra
+YZ Ceti c,YZ Ceti,0.98,Earth,1,Earth,3.06,0.022,0.04,Terra
+YZ Ceti d,YZ Ceti,1.14,Earth,1.05,Earth,4.66,0.029,0.13,Terra
+Kapteyn's Star b,Kapteyn's Star,4.5,Earth,1.6,Earth,48.6,0.168,0.21,Terra
+Kapteyn's Star c,Kapteyn's Star,7,Earth,2,Earth,121.5,0.311,0.23,Terra
+Wolf 1061 c,Wolf 1061,3.41,Earth,1.5,Earth,17.87,0.089,0.11,Terra
+Wolf 1061 d,Wolf 1061,7.7,Earth,2,Earth,217.2,0.47,0.55,Terra
+Gliese 667C b,Gliese 667C,5.94,Earth,1.8,Earth,7.2,0.049,0.13,Terra
+Gliese 667C c,Gliese 667C,3.86,Earth,1.5,Earth,28.14,0.125,0.02,Terra
+Gliese 876 b,Gliese 876,2.27,Jupiter,1.2,Jupiter,61.12,0.208,0.032,Jupiter
+Gliese 876 c,Gliese 876,0.714,Jupiter,0.9,Jupiter,30.09,0.13,0.256,Jupiter
+Gliese 876 d,Gliese 876,6.83,Earth,2,Earth,1.94,0.021,0.21,Terra
+Gliese 876 e,Gliese 876,14.6,Earth,2.5,Earth,124.26,0.334,0.055,Neptune
+Gliese 832 b,Gliese 832,0.64,Jupiter,0.8,Jupiter,3416,3.4,0.12,Jupiter
+Gliese 832 c,Gliese 832,5.4,Earth,1.7,Earth,35.68,0.163,0.18,Terra
+HD 20794 b,HD 20794,2.7,Earth,1.3,Earth,18.3,0.121,0,Terra
+HD 20794 c,HD 20794,2.4,Earth,1.2,Earth,40.1,0.205,0,Terra
+HD 20794 d,HD 20794,4.8,Earth,1.6,Earth,90.3,0.35,0,Terra
+HD 20794 e,HD 20794,4.7,Earth,1.6,Earth,147,0.509,0,Terra
+HD 26965 b,HD 26965,8.4,Earth,2.1,Earth,42.38,0.215,0.05,Terra
+Luyten b,Luyten's Star,2.89,Earth,1.4,Earth,18.65,0.091,0.1,Terra
+Teegarden's Star b,Teegarden's Star,1.05,Earth,1.02,Earth,4.91,0.025,0,Terra
+Teegarden's Star c,Teegarden's Star,1.11,Earth,1.04,Earth,11.41,0.044,0,Terra
+K2-18b,K2-18,8.6,Earth,2.3,Earth,32.94,0.143,0,Neptune
+GJ 1214 b,GJ 1214,6.55,Earth,2.68,Earth,1.58,0.014,0.27,Neptune
+GJ 436 b,GJ 436,22.2,Earth,4.3,Earth,2.64,0.029,0.15,Neptune
+GJ 3293 b,GJ 3293,23.5,Earth,4.5,Earth,30.6,0.144,0.06,Neptune
+GJ 3293 c,GJ 3293,21.8,Earth,4.3,Earth,122.6,0.364,0.37,Neptune
+HD 219134 b,HD 219134,4.74,Earth,1.6,Earth,3.09,0.039,0,Terra
+HD 219134 c,HD 219134,4.36,Earth,1.5,Earth,6.77,0.065,0.06,Terra
+HD 219134 d,HD 219134,16.2,Earth,2.7,Earth,46.86,0.237,0.14,Neptune
+HD 219134 f,HD 219134,7.3,Earth,1.9,Earth,22.72,0.146,0.15,Terra
+HD 219134 g,HD 219134,11,Earth,2.3,Earth,94.2,0.375,0.06,Neptune
+TRAPPIST-1 b,TRAPPIST-1,1.017,Earth,1.121,Earth,1.51,0.0115,0,Terra
+TRAPPIST-1 c,TRAPPIST-1,1.156,Earth,1.095,Earth,2.42,0.0158,0,Terra
+TRAPPIST-1 d,TRAPPIST-1,0.297,Earth,0.784,Earth,4.05,0.0223,0,Terra
+TRAPPIST-1 e,TRAPPIST-1,0.772,Earth,0.91,Earth,6.1,0.0293,0,Terra
+TRAPPIST-1 f,TRAPPIST-1,0.934,Earth,1.046,Earth,9.21,0.0385,0,Terra
+TRAPPIST-1 g,TRAPPIST-1,1.148,Earth,1.148,Earth,12.35,0.0469,0,Terra
+TRAPPIST-1 h,TRAPPIST-1,0.331,Earth,0.773,Earth,18.77,0.0619,0,Terra

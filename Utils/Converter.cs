@@ -7,7 +7,7 @@ namespace MilkyWay.Utils
 {
     internal static class Converter
     {
-        private static StellarTypeGenerator.StellarType ConvertToScientificType(StellarTypeGenerator.StellarType type)
+        public static StellarTypeGenerator.StellarType ConvertToScientificType(StellarTypeGenerator.StellarType type)
         {
             return type switch
             {
@@ -54,7 +54,7 @@ namespace MilkyWay.Utils
                 _ => StellarTypeGenerator.StellarType.G5V
             };
         }
-        static UnifiedSystemGenerator.StarSystem ConvertRealStarToSystem(Star star, UnifiedSystemGenerator unifiedGen)
+        public static UnifiedSystemGenerator.StarSystem ConvertRealStarToSystem(Star star, UnifiedSystemGenerator unifiedGen)
         {
             var realData = star.RealStarData!;
 
@@ -232,15 +232,15 @@ namespace MilkyWay.Utils
 
             return system;
         }
-    static UnifiedSystemGenerator.PlanetType ConvertPlanetType(string type)
+    public static UnifiedSystemGenerator.PlanetType ConvertPlanetType(string type)
     {
         return type.ToLower() switch
         {
-            "terrestrial" => UnifiedSystemGenerator.PlanetType.Terra,
-            "gas giant" => UnifiedSystemGenerator.PlanetType.Jupiter,
-            "ice giant" => UnifiedSystemGenerator.PlanetType.Neptune,
-            "ocean" => UnifiedSystemGenerator.PlanetType.Aquaria,
-            "rocky" => UnifiedSystemGenerator.PlanetType.Selena,
+            "terra" => UnifiedSystemGenerator.PlanetType.Terra,
+            "jupiter" => UnifiedSystemGenerator.PlanetType.Jupiter,
+            "neptune" => UnifiedSystemGenerator.PlanetType.Neptune,
+            "aquaria" => UnifiedSystemGenerator.PlanetType.Aquaria,
+            "selena" => UnifiedSystemGenerator.PlanetType.Selena,
             _ => UnifiedSystemGenerator.PlanetType.Terra
         };
     }
