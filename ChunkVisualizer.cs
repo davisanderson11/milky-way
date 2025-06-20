@@ -246,44 +246,48 @@ public class ChunkVisualizer
         }
     }
     
-    private void DrawStars(SKCanvas canvas, List<StarPosition> stars, 
-        Func<StarPosition, double> getX, Func<StarPosition, double> getY, 
-        double scale, double offsetX, double offsetY, bool realStarsOnly = false)
+   private void DrawStars(SKCanvas canvas, List<StarPosition> stars,
+    Func<StarPosition, double> getX, Func<StarPosition, double> getY,
+    double scale, double offsetX, double offsetY, bool realStarsOnly = false)
+{
+    using (var paint = new SKPaint())
     {
-        using (var paint = new SKPaint())
+        paint.IsAntialias = true;
+        paint.BlendMode   = SKBlendMode.Plus;
+
+        foreach (var sp in stars)
         {
-            paint.IsAntialias = true;
-            paint.BlendMode = SKBlendMode.Plus;
-            
-            foreach (var star in stars)
-            {
-                // Skip non-real stars if realStarsOnly is true
-                if (realStarsOnly && !star.Star.IsRealStar) continue;
-                
-                var x = (float)((getX(star) - offsetX) * scale + imageSize / 2);
-                var y = (float)((getY(star) - offsetY) * scale + imageSize / 2);
-                
-                if (x < 0 || x >= imageSize || y < 0 || y >= imageSize) continue;
-                
-                // UNIFORM SIZE AND BRIGHTNESS FOR ALL STARS
-                var size = 1.0f; // Same size for all stars
-                
-                // Color from star - but all at same brightness
-                var starColor = star.Star.Color;
-                var alpha = (byte)(255); // Full brightness for all stars
-                
-                paint.Color = new SKColor(
-                    (byte)(starColor.X * 255),
-                    (byte)(starColor.Y * 255),
-                    (byte)(starColor.Z * 255),
-                    alpha
-                );
-                
-                // Draw star
-                canvas.DrawCircle(x, y, size, paint);
-            }
+            var star = sp.Star;
+
+            // 1) If requested, skip any procedural stars
+            if (realStarsOnly && !star.IsRealStar)
+                continue;
+
+            // 2) Skip companion stars: only draw those where RawName == SystemName
+            if (sp.RawName != star.SystemName)
+                continue;
+
+            // 3) Compute on-screen position
+            var x = (float)((getX(sp) - offsetX) * scale + imageSize / 2);
+            var y = (float)((getY(sp) - offsetY) * scale + imageSize / 2);
+            if (x < 0 || x >= imageSize || y < 0 || y >= imageSize)
+                continue;
+
+            // 4) Draw the star dot
+            const float size = 1.0f;
+            var c = star.Color;
+            paint.Color = new SKColor(
+                (byte)(c.X * 255),
+                (byte)(c.Y * 255),
+                (byte)(c.Z * 255),
+                255
+            );
+            canvas.DrawCircle(x, y, size, paint);
         }
     }
+}
+
+
     
     private void DrawSubView(SKCanvas canvas, List<StarPosition> stars,
         Func<StarPosition, double> getX, Func<StarPosition, double> getY,
@@ -459,6 +463,8 @@ public class ChunkVisualizer
     private class StarPosition
     {
         public Star Star { get; set; } = null!;
+
+        public string RawName { get; set; } = null!;
         public float X { get; set; }
         public float Y { get; set; }
         public float Z { get; set; }
