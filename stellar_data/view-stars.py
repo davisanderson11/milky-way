@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse                              # for territory toggle
+import argparse
 import pandas as pd
 import numpy as np
 import re
@@ -7,7 +7,8 @@ from scipy.spatial import ConvexHull
 import plotly.graph_objects as go
 
 # Parse command-line args
-parser = argparse.ArgumentParser(description="Visualize nearby stars with optional territory bubbles")
+default_description = "Visualize nearby stars with optional territory bubbles"
+parser = argparse.ArgumentParser(description=default_description)
 parser.add_argument(
     "--no-territory",
     action="store_true",
@@ -19,8 +20,6 @@ args = parser.parse_args()
 df = pd.read_csv("stars.csv")
 companion_pattern = re.compile(r".* [A-Z]$")
 df = df[~df['Name'].str.match(companion_pattern, na=False)]
-
-# Distance is already in LY
 df['r_ly'] = df['Distance']
 
 # Spherical → Cartesian
@@ -30,14 +29,18 @@ df['x'] = df['r_ly'] * np.cos(df['dec_rad']) * np.cos(df['ra_rad'])
 df['y'] = df['r_ly'] * np.cos(df['dec_rad']) * np.sin(df['ra_rad'])
 df['z'] = df['r_ly'] * np.sin(df['dec_rad'])
 
-# Center on Sol
-sol = df[df['Name']=="Sol"]
-if sol.empty:
+# Center on Sol (0,0,0)
+sol_row = df[df['Name'] == "Sol"]
+if sol_row.empty:
     raise RuntimeError("No entry named 'Sol' in stars.csv")
-sol = sol.iloc[0]
+# After subtraction, Sol's x0,y0,z0 will be (0,0,0)
+sol = sol_row.iloc[0]
 df['x0'] = df['x'] - sol['x']
 df['y0'] = df['y'] - sol['y']
 df['z0'] = df['z'] - sol['z']
+
+# Store Sol-centered origin explicitly
+sol_x0, sol_y0, sol_z0 = 0.0, 0.0, 0.0
 
 # 2) Spectral classes & colors
 spec_classes = sorted({st[0] for st in df['SpectralType'].dropna()})
@@ -51,10 +54,10 @@ for cls in spec_classes:
     color_map.setdefault(cls, 'gray')
 
 # 3) Slider cutoffs
-max_dist    = df['r_ly'].max()
+max_dist = df['r_ly'].max()
 slider_vals = np.linspace(0, max_dist, 20)
 
-# 4) Build doubled‐up scatter traces for hover hit-areas
+# 4) Build doubled-up scatter traces for hover hit-areas
 def make_traces(cutoff):
     traces = []
     mask = df['r_ly'] <= cutoff
@@ -90,7 +93,7 @@ fig = go.Figure(
     frames=[go.Frame(data=make_traces(v), name=f"{v:.1f}") for v in slider_vals]
 )
 
-# 6) Add galactic plane (z=0) behind everything
+# 6) Add galactic plane (z=0)
 plane = max_dist
 xx, yy = np.meshgrid([-plane, plane], [-plane, plane])
 zz = np.zeros_like(xx)
@@ -118,110 +121,287 @@ for r in ring_radii:
         hoverinfo='skip', showlegend=False
     ))
 
-# 7.5) Allied Core territory bubble (inflated, smoothed, legend toggle)
+# 7.5) Territory bubbles via axis-aligned expansion
 if not args.no_territory:
-    allied = [
-        "Sol", "Proxima Centauri", "Α Centauri", "Barnard’s Star",
-        "Lalande 21185", "Wolf 359", "Luyten’s Star", "61 Cygni",
-        "YZ Ceti", "DX Cancri", "Ross 248", "Ε Eridani",
-        "Teegarden’s Star", "Ε Indi", "Gliese 65", "Ross 128",
-        "Lacaille 9352", "EZ Aquarii", "Struve 2398", "GJ 1061"
+    # Store territory data for filtering
+    territory_star_indices = {}
+    territory_meshes = {}
+    
+    # define each region with a center offset and expansions
+    territories = [
+        {
+            'name': 'Allied Core Systems',
+            'center': (sol_x0, sol_y0, sol_z0),
+            'expansion': {'x': (-15, 15), 'y': (-15, 7), 'z': (-7, 13)},
+            'color': 'green'
+        },
+        {
+            'name': 'Boreal Congress',
+            # center at Alpha Coronae Borealis
+            'center_name': 'Alpha Coronae Borealis',
+            'expansion': {'x': (-20, 20), 'y': (-20, 20), 'z': (-20, 20)},
+            'color': 'cyan'
+        },
+        {
+            'name': 'Sirius-Procyon Assembly',
+            'center_name': 'Procyon',
+            'expansion': {'x': (-10, 15), 'y': (-3, 15), 'z': (-12, 15)},
+            'color': 'yellow'
+        },
+        {
+            'name': 'Second Tribunal',
+            'center_name': '41 G. Arae',
+            'expansion': {'x': (-10, 10), 'y': (-10, 10), 'z': (-10, 10)},
+            'color': 'red'
+        },
+        {
+            'name': 'Regulus Electorate',
+            'center_name': 'Regulus',
+            'expansion': {'x': (-35, 35), 'y': (-35, 35), 'z': (-20, 20)},
+            'color': 'orange'
+        },
+        {
+            'name': 'Aldebaran Electorate',
+            'center_name': 'Aldebaran',
+            'expansion': {'x': (-15, 15), 'y': (-15, 15), 'z': (-15, 15)},
+            'color': 'orange'
+        },
+        {
+            'name': 'Alpha Cephei Electorate',
+            'center_name': 'Alpha Cephei',
+            'expansion': {'x': (-15, 15), 'y': (-15, 15), 'z': (-15, 15)},
+            'color': 'orange'
+        }
     ]
-    pts = df[df['Name'].isin(allied)][['x0','y0','z0']].values
 
-    if len(pts) >= 4:
-        # inflate points outwards from centroid
-        centroid = pts.mean(axis=0)
-        directions = pts - centroid
-        inflated = centroid + directions * 1.15  # 15% expansion
+    for info in territories:
+        # determine center
+        if 'center_name' in info:
+            row = df[df['Name'] == info['center_name']]
+            if row.empty:
+                print(f"Warning: {info['center_name']} not found!")
+                continue
+            cx, cy, cz = row.iloc[0][['x0', 'y0', 'z0']]
+            print(f"\n{info['name']} centered at {info['center_name']}: ({cx:.2f}, {cy:.2f}, {cz:.2f})")
+        else:
+            cx, cy, cz = info['center']
 
-        # compute convex hull on inflated points
-        hull = ConvexHull(inflated)
-        hull_pts = inflated.copy()
+        ex = info['expansion']
+        print(f"  Bounds: X[{cx + ex['x'][0]:.2f}, {cx + ex['x'][1]:.2f}], Y[{cy + ex['y'][0]:.2f}, {cy + ex['y'][1]:.2f}], Z[{cz + ex['z'][0]:.2f}, {cz + ex['z'][1]:.2f}]")
+        mask = (
+            (df['x0'] >= cx + ex['x'][0]) & (df['x0'] <= cx + ex['x'][1]) &
+            (df['y0'] >= cy + ex['y'][0]) & (df['y0'] <= cy + ex['y'][1]) &
+            (df['z0'] >= cz + ex['z'][0]) & (df['z0'] <= cz + ex['z'][1])
+        )
+        # Store the indices of stars in this territory
+        territory_indices = df[mask].index.tolist()
+        pts = df[mask][['x0', 'y0', 'z0']].values
+        print(f"  Stars in territory: {len(pts)}")
+        if len(pts) < 4:
+            print(f"  Skipping - need at least 4 stars")
+            continue
 
-        # add midpoint of each hull edge for extra vertices
-        for simplex in hull.simplices:
+        # Store star indices for this territory
+        territory_star_indices[info['name']] = territory_indices
+
+        # convex hull + smoothing
+        hull = ConvexHull(pts)
+        hull_pts = pts.copy()
+        for s in hull.simplices:
             for i, j in [(0,1), (1,2), (2,0)]:
-                mid = (inflated[simplex[i]] + inflated[simplex[j]]) / 2
-                hull_pts = np.vstack([hull_pts, mid])
+                hull_pts = np.vstack([hull_pts,
+                    (pts[s[i]] + pts[s[j]]) / 2
+                ])
+        smooth = ConvexHull(hull_pts)
 
-        # final hull for mesh
-        smooth_hull = ConvexHull(hull_pts)
-
-        fig.add_trace(go.Mesh3d(
-            x=smooth_hull.points[:,0],
-            y=smooth_hull.points[:,1],
-            z=smooth_hull.points[:,2],
-            i=smooth_hull.simplices[:,0],
-            j=smooth_hull.simplices[:,1],
-            k=smooth_hull.simplices[:,2],
+        # Create mesh trace
+        mesh_trace = go.Mesh3d(
+            x=smooth.points[:,0],
+            y=smooth.points[:,1],
+            z=smooth.points[:,2],
+            i=smooth.simplices[:,0],
+            j=smooth.simplices[:,1],
+            k=smooth.simplices[:,2],
             opacity=0.2,
-            color='green',
-            name='Allied Core Territory',
+            color=info['color'],
+            name=info['name'],
             showscale=False,
-            showlegend=True         # ← makes it appear under the legend (key)
-        ))
+            showlegend=True
+        )
+        
+        fig.add_trace(mesh_trace)
+        territory_meshes[info['name']] = len(fig.data) - 1  # Store trace index
+    
+    # Update stars.csv with allegiance information
+    print("\nUpdating stars.csv with allegiance information...")
+    
+    # Read the original CSV to preserve all data including companion stars
+    df_original = pd.read_csv("stars.csv")
+    
+    # Add Allegiance column if it doesn't exist
+    if 'Allegiance' not in df_original.columns:
+        df_original['Allegiance'] = 'Independent'  # Default to Independent
+    
+    # Reset all to Independent first (in case territories changed)
+    df_original['Allegiance'] = 'Independent'
+    
+    # For each territory, find matching stars in the original dataframe
+    for territory_name, star_indices in territory_star_indices.items():
+        # Get the names of stars in this territory
+        territory_star_names = df.loc[star_indices, 'Name'].tolist()
+        
+        # Update allegiance for these stars in the original dataframe
+        df_original.loc[df_original['Name'].isin(territory_star_names), 'Allegiance'] = territory_name
+    
+    # Save updated CSV
+    df_original.to_csv('stars.csv', index=False)
+    print(f"stars.csv updated with Allegiance column - {len(territory_star_indices)} territories assigned")
 
 # 8) Slider steps
 steps = [
     dict(
         method='animate',
-        args=[[f"{v:.1f}"],
-              dict(mode='immediate', frame=dict(duration=0), transition=dict(duration=0))],
+        args=[[f"{v:.1f}"], dict(mode='immediate', frame=dict(duration=0), transition=dict(duration=0))],
         label=f"{v:.0f} ly"
     ) for v in slider_vals
 ]
 
-# 9) Reorder so plane, rings, & (optional) bubble are under all scatter traces
-extra = 1 + len(ring_radii)*2 + (0 if args.no_territory else 1)
+# 9) Reorder so planes, rings, & meshes are beneath stars
+mesh_count = 1 + len(ring_radii)*2 + (0 if args.no_territory else len(territories))
 all_traces = list(fig.data)
-plane_and_rings = all_traces[:extra]
-stars = all_traces[extra:]
-fig.data = tuple(plane_and_rings + stars)
+under = all_traces[:mesh_count]
+over  = all_traces[mesh_count:]
+fig.data = tuple(under + over)
 
-# 10) Final layout: responsive full-window, dark plot-area, axis spikes, legend as “Key”
+# 10) Add territory filter dropdown if territories exist
+dropdown_menus = []
+if not args.no_territory and territory_star_indices:
+    # Get the number of star traces (before territories were added)
+    num_star_traces = len(spec_classes) * 2  # 2 traces per spectral class
+    num_base_traces = 1 + len(ring_radii) * 2  # plane + rings
+    
+    # Store original star trace data for "All Territories" option
+    original_star_data = []
+    for i in range(num_base_traces, num_base_traces + num_star_traces):
+        trace = fig.data[i]
+        original_star_data.append({
+            'x': trace.x,
+            'y': trace.y,
+            'z': trace.z,
+            'text': getattr(trace, 'text', None)
+        })
+    
+    buttons = [
+        dict(
+            label="All Territories",
+            method="update",
+            args=[
+                {
+                    "visible": [True] * len(fig.data),
+                    "x": [d['x'] for d in original_star_data] + [None] * (len(fig.data) - num_base_traces - num_star_traces),
+                    "y": [d['y'] for d in original_star_data] + [None] * (len(fig.data) - num_base_traces - num_star_traces),
+                    "z": [d['z'] for d in original_star_data] + [None] * (len(fig.data) - num_base_traces - num_star_traces),
+                    "text": [d['text'] for d in original_star_data] + [None] * (len(fig.data) - num_base_traces - num_star_traces)
+                },
+                [num_base_traces + i for i in range(num_star_traces)]
+            ]
+        )
+    ]
+    
+    # Add individual territory views
+    for territory_name, star_indices in territory_star_indices.items():
+        # Get stars in this territory
+        territory_stars = df.loc[star_indices]
+        
+        # Build trace data for only this territory's stars
+        trace_data = []
+        
+        # Recreate star traces with only territory stars
+        for cls in spec_classes:
+            cls_stars = territory_stars[territory_stars['SpectralType'].str.startswith(cls, na=False)]
+            
+            if len(cls_stars) > 0:
+                hover_text = [
+                    f"{name}: ({x0:.2f}, {y0:.2f}, {z0:.2f})\nDistance: {r:.2f} ly"
+                    for name, r, x0, y0, z0 in zip(
+                        cls_stars['Name'], cls_stars['r_ly'], 
+                        cls_stars['x0'], cls_stars['y0'], cls_stars['z0']
+                    )
+                ]
+                
+                # Hover trace
+                trace_data.append(dict(
+                    x=cls_stars['x0'].tolist(),
+                    y=cls_stars['y0'].tolist(),
+                    z=cls_stars['z0'].tolist(),
+                    text=hover_text
+                ))
+                
+                # Visible trace
+                trace_data.append(dict(
+                    x=cls_stars['x0'].tolist(),
+                    y=cls_stars['y0'].tolist(),
+                    z=cls_stars['z0'].tolist()
+                ))
+            else:
+                # Empty traces for this spectral class
+                trace_data.append(dict(x=[None], y=[None], z=[None], text=[""]))
+                trace_data.append(dict(x=[None], y=[None], z=[None]))
+        
+        # Create visibility array
+        visible = [True] * len(fig.data)  # Start with all visible
+        
+        # Hide all territory meshes except this one
+        for t_name, mesh_idx in territory_meshes.items():
+            visible[mesh_idx] = (t_name == territory_name)
+        
+        buttons.append(dict(
+            label=territory_name,
+            method="update",
+            args=[
+                {
+                    "visible": visible,
+                    "x": [td.get('x') for td in trace_data] + [None] * (len(fig.data) - num_base_traces - num_star_traces),
+                    "y": [td.get('y') for td in trace_data] + [None] * (len(fig.data) - num_base_traces - num_star_traces),
+                    "z": [td.get('z') for td in trace_data] + [None] * (len(fig.data) - num_base_traces - num_star_traces),
+                    "text": [td.get('text', []) for td in trace_data] + [None] * (len(fig.data) - num_base_traces - num_star_traces)
+                },
+                [num_base_traces + i for i in range(num_star_traces)]  # Update only star traces
+            ]
+        ))
+    
+    dropdown_menus.append(dict(
+        buttons=buttons,
+        direction="down",
+        showactive=True,
+        x=0.1,
+        xanchor="left",
+        y=1.15,
+        yanchor="top"
+    ))
+
+# 11) Final layout
 fig.update_layout(
     title="Primary Real Stars around Sol (0,0,0)",
     autosize=True,
-    margin=dict(l=0, r=0, t=50, b=0),
+    margin=dict(l=0, r=0, t=100, b=0),  # Increased top margin for dropdown
     sliders=[dict(
         active=len(steps)-1,
         currentvalue={'prefix':'Max distance: '},
         pad={'t':50},
         steps=steps
     )],
-    legend=dict(
-        title='Key',                # ← legend now titled “Key”
-        itemsizing='constant'
-    ),
+    updatemenus=dropdown_menus,
+    legend=dict(title='Key', itemsizing='constant'),
     hovermode='closest',
     scene=dict(
         bgcolor='rgb(10,10,10)',
         aspectmode='cube',
-        xaxis=dict(
-            range=[-max_dist, max_dist],
-            backgroundcolor='rgb(10,10,10)',
-            gridcolor='gray', zerolinecolor='gray',
-            showspikes=True, spikesides=True, spikethickness=1
-        ),
-        yaxis=dict(
-            range=[-max_dist, max_dist],
-            backgroundcolor='rgb(10,10,10)',
-            gridcolor='gray', zerolinecolor='gray',
-            showspikes=True, spikesides=True, spikethickness=1
-        ),
-        zaxis=dict(
-            range=[-max_dist, max_dist],
-            backgroundcolor='rgb(10,10,10)',
-            gridcolor='gray', zerolinecolor='gray',
-            showspikes=True, spikesides=True, spikethickness=1
-        ),
-        camera=dict(
-            center=dict(x=0, y=0, z=0),
-            eye=dict(x=1.25, y=1.25, z=1.25)
-        )
+        xaxis=dict(range=[-max_dist, max_dist], backgroundcolor='rgb(10,10,10)', gridcolor='gray', zerolinecolor='gray', showspikes=True, spikesides=True, spikethickness=1),
+        yaxis=dict(range=[-max_dist, max_dist], backgroundcolor='rgb(10,10,10)', gridcolor='gray', zerolinecolor='gray', showspikes=True, spikesides=True, spikethickness=1),
+        zaxis=dict(range=[-max_dist, max_dist], backgroundcolor='rgb(10,10,10)', gridcolor='gray', zerolinecolor='gray', showspikes=True, spikesides=True, spikethickness=1),
+        camera=dict(center=dict(x=0, y=0, z=0), eye=dict(x=1.25, y=1.25, z=1.25))
     )
 )
 
-# Show responsively to fill browser window
 fig.show(config={'responsive': True})
